@@ -1,7 +1,7 @@
 //Here we store the schema and model for each collection
 //Imported into our app when we need it
 const mongoose = require('mongoose');//mongoose used to connect to our MongoDB database
-
+const Chatroom = require('./chatroom')
 //We need to create a Mongoose model to store our data in MongoDB, say for each user
 //Model == Table Entry, MongoDB Collection == Table
 //Models require a collection name to store in, and a Schema
@@ -51,6 +51,10 @@ const userSchema = mongoose.Schema(
         image: {
             type: String, //URL
             lowercase: true
+        },
+        chats: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Chatroom'
         }
     },
     {
