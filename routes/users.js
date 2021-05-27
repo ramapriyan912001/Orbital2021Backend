@@ -27,10 +27,13 @@ const typicalUser = (req) => new User({
 //When we want to return ALL data from our MongoDB databse, we need to use our Mongoose model and return .find()
 router.get(`/`, (req, res) => {
     let filter = {};//Initially filter is an empty collection
-    if (req.query.products) {//If there are product queries, i.e., we want to filter out all user who like a certain product, then this code runs
-        //the uri is goint to be like http://localhost:3000/api/v1/user?product=123,787 -> where 123, 787 are the codes for the products we want to filter by
-        filter = {product: req.query.products.split(',')};//this part splits each entry of the query by comma and adds into an array, which is assigned to our filter
-    }
+    
+    //This is if we need to filter certain queries out -> Specific Query GETs
+    // if (req.query.products) {//If there are product queries, i.e., we want to filter out all user who like a certain product, then this code runs
+    //     //the uri is goint to be like http://localhost:3000/api/v1/user?product=123,787 -> where 123, 787 are the codes for the products we want to filter by
+    //     filter = {product: req.query.products.split(',')};//this part splits each entry of the query by comma and adds into an array, which is assigned to our filter
+    // }
+
     User.find(filter).select('-passwordhash')//Making it async and using await == Using promise .then() and .catch()
     //.select() chooses the fields we want to send, e.g.  -dob -> don't send date of birth back
     .then(foundUser => 
@@ -52,7 +55,7 @@ router.get(`/:id`, (req, res) => {
         res.status(400).send('Invalid User ID');
     }
     //Making it async and using await == Using promise .then() and .catch()
-    User.findById(req.params.id).populate('product').select('-passwordhash')//populate(___) -> shows details of field in blank (provided they are referenced)
+    User.findById(req.params.id).select('-passwordhash')//.populate('product') -> shows details of field in blank (provided they are referenced)
     .then((foundUser) => {
         if (!foundUser) {//Analogous to .catch()
             res.status(400).send('Not Found!');
@@ -75,7 +78,7 @@ router.get('/get/count', (req, res) => {
 });
 
 //API for Logins through POST
-//User logs into localhost:process.env.PORT/api/v1/userinfo/login/ with email to get authenticated
+//User logs into localhost:process.env.PORT/api/v1/users/login/ with email to get authenticated
 router.post(`/login`, async (req, res) => {
     User
     .findOne({email: req.body.email})
@@ -120,7 +123,7 @@ router.post(`/login`, async (req, res) => {
 });
 
 //API for Registering New Users through POST
-//User registers into localhost:3000/api/v1/userinfo/register/ with email to get authenticated
+//User registers into localhost:3000/api/v1/users/register/ with email to get authenticated
 router.post(`/register`, (req, res) => {
     
     let userToRegister = typicalUser(req); //For this to work, the frontend must send JSON fields with the exact same labels
@@ -130,7 +133,7 @@ router.post(`/register`, (req, res) => {
     .then((createdUser) => res.status(201).json({
         createdUser,
         success: true
-    }))//return created product in json form by showing us 201 code for success
+    }))//return created user in json form by showing us 201 code for success
     .catch((err) => res.status(500).json({
         error: err,
         success: false})//return an error JSON showing the error and that the success is not true, after showing us error code 500 for failure
@@ -148,12 +151,12 @@ router.delete(`/:id`, (req, res) => {
         if (user) {
             res.status(201).json({
                 success: true,
-                message: "Product is deleted"
+                message: "User is deleted"
             });
         } else {
             res.status(404).json({
                 success: false,
-                message: "Product not found"
+                message: "User not found"
             })};
         }).catch(err => res.status(500).json({
                 success: false,

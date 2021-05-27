@@ -10,7 +10,7 @@ function authJwt() {
     })
     .unless({
         path: [
-            // {//Create an Object to add multiple methods to a generic link
+            // {//Create an Object to add multiple methods to a generic link -> KEEPING THIS if we need to use something similar later
             //     url: /\/public\/uploads(.*)/,// Use RegEx to cover all possible links 
             //     methods: ['GET', 'OPTIONS']// We shuold be able to get any product without authentication (Post requires authentication)
             // },
