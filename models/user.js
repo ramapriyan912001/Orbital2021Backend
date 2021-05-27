@@ -48,7 +48,7 @@ const userSchema = mongoose.Schema(
             type: Date,
             default: Date.now
         },
-        avatar: {
+        image: {
             type: String, //URL
             lowercase: true
         }

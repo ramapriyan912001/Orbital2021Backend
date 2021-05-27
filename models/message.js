@@ -11,6 +11,10 @@ const messageSchema = mongoose.Schema(
             type: Boolean,
             default: false,
         },
+        location: {
+            type: String,
+            default: "",
+        },
         media: {
             type: String,
             default: "",
