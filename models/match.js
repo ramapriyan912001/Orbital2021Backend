@@ -27,6 +27,10 @@ const matchSchema = mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User'
         },
+        date: {
+            type: Date,
+            required: 'Date is required'
+        }
     },
     {
         collection: 'users'
