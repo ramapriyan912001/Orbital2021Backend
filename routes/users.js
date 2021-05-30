@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const {User} = require('../models/user');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const {chatRoom, Chatroom} = require('../models/chatroom')
 
 //Initialise the Router to create backend APIs
 const router = express.Router();
@@ -20,7 +21,8 @@ const typicalUser = (req) => new User({
     cuisine:  req.body.cuisine,
     crossIndustry: req.body.crossIndustry,
     isOnline: req.body.isOnline,
-    lastSeen: req.body.lastSeen
+    lastSeen: req.body.lastSeen,
+    chats: new Chatroom()
 });
 
 //API for GET

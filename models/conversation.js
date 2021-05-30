@@ -42,4 +42,4 @@ conversationSchema.virtual('id').get(function () {
 conversationSchema.set('toJSON', {virtuals: true,});
 
 //With our Schema, we can create a Model
-exports.Conversation = mongoose.model('matches', conversationSchema);
+exports.Conversation = mongoose.model('conversations', conversationSchema);
