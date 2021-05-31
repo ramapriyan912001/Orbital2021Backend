@@ -9,19 +9,20 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 
 //Factory method to construct Users
-const typicalUser = (req) => new User({
-    name: req.body.name,
-    dob: req.body.dob,
-    email: req.body.email,
-    passwordhash: bcrypt.hashSync(req.body.password, bcrypt.genSaltSync(4)),
-    isAdmin: req.body.isAdmin,
-    image: req.body.image,
-    diet: req.body.diet,
-    cuisine:  req.body.cuisine,
-    crossIndustry: req.body.crossIndustry,
-    isOnline: req.body.isOnline,
-    lastSeen: req.body.lastSeen
-});
+const typicalUser = (req) => {
+    return new User({
+    name: req.body.body.name,
+    dob: req.body.body.dob,
+    email: req.body.body.email,
+    passwordhash: bcrypt.hashSync(req.body.body.password, bcrypt.genSaltSync(4)),
+    isAdmin: req.body.body.isAdmin,
+    image: req.body.body.image,
+    diet: req.body.body.diet,
+    cuisine:  req.body.body.cuisine,
+    crossIndustry: req.body.body.crossIndustry,
+    isOnline: req.body.body.isOnline,
+    lastSeen: req.body.body.lastSeen
+});};
 
 //API for GET
 //When we want to return ALL data from our MongoDB databse, we need to use our Mongoose model and return .find()
@@ -81,18 +82,17 @@ router.get('/get/count', (req, res) => {
 //User logs into localhost:process.env.PORT/api/v1/users/login/ with email to get authenticated
 router.post(`/login`, async (req, res) => {
     User
-    .findOne({email: req.body.email})
+    .findOne({email: req.body.body.email})
     .then(foundUser => {
         if (!foundUser) {
-            res.status(400).json({
+            return res.status(401).json({
                 message: 'Invalid Email',
                 success: false,
             })
         }
-
         //e-mail valid, authenticate password and issue jwt
 
-        if (foundUser && bcrypt.compareSync(req.body.password, foundUser.passwordhash)) {
+        if (foundUser && bcrypt.compareSync(req.body.body.password, foundUser.passwordhash)) {
             const token = jwt.sign(
                 {
                     userID: foundUser.id,
@@ -103,14 +103,15 @@ router.post(`/login`, async (req, res) => {
                     expiresIn: '1d'//1d -> 1 day, 1w -> 1 week
                 }
             );
-            res.status(200).json({
+            return res.status(200).json({
                 message: 'Logged in',
                 email: foundUser.email,
                 isAdmin: foundUser.isAdmin,
-                token: token
+                token: token,
+                success: true
             });
         } else {
-            res.status(400).json({
+            return res.status(402).json({
                 message: 'Incorrect Password',
                 success: false
             })
@@ -130,14 +131,23 @@ router.post(`/register`, (req, res) => {
 
     userToRegister
     .save()
-    .then((createdUser) => res.status(201).json({
+    .then((createdUser) => 
+        createdUser
+        ? res.status(200).json({
         createdUser,
         success: true
-    }))//return created user in json form by showing us 201 code for success
-    .catch((err) => res.status(500).json({
+    })
+        : res.status(400).json({
+            message: 'Bad Request',
+            success: false
+        })
+    )//return created user in json form by showing us 201 code for success
+    .catch((err) => {
+        console.log(err);
+        res.status(500).json({
         error: err,
         success: false})//return an error JSON showing the error and that the success is not true, after showing us error code 500 for failure
-        );
+    });
 });
 
 //API for Delete

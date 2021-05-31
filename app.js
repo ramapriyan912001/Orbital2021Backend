@@ -30,7 +30,7 @@ app.use(auth_error);
 // app.use(`/${process.env.UPLOAD_PATH}`, express.static(__dirname + `/${process.env.UPLOAD_PATH}`));
 //Enable CORS
 app.use(cors());
-app.options('*', cors());//* -> all, as in All Requiests are permitted to use CORS
+app.options('*', cors());//* -> all, as in All Requests are permitted to use CORS
 
 //Use created routers
 app.use(`${api}/users`, User);
