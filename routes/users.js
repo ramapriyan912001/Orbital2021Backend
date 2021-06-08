@@ -1,4 +1,5 @@
 //Import the Model and Express
+const _ = require('lodash');
 const express = require('express');
 const mongoose = require('mongoose');
 const {User} = require('../models/user');
@@ -40,8 +41,8 @@ router.get(`/`, (req, res) => {
     //.select() chooses the fields we want to send, e.g.  -dob -> don't send date of birth back
     .then(foundUser => 
         foundUser
-        ? res.status(200).send(foundUser)
-        : res.status(400).send('No records found')
+        ? res.status(200).json({user: foundUser, success:true})
+        : res.status(400).json({message: 'No records found', success: false})
     )
     .catch(err =>
         res.status(500).json({
@@ -54,15 +55,45 @@ router.get(`/`, (req, res) => {
 router.get(`/:id`, (req, res) => {
     //Validate User's ObjectID
     if (!mongoose.isValidObjectId(req.params.id)) {
-        res.status(400).send('Invalid User ID');
+        res.status(400).json({message: 'Invalid User ID',success: false});
     }
     //Making it async and using await == Using promise .then() and .catch()
     User.findById(req.params.id).select('-passwordhash')//.populate('product') -> shows details of field in blank (provided they are referenced)
     .then((foundUser) => {
         if (!foundUser) {//Analogous to .catch()
-            res.status(400).send('Not Found!');
+            res.status(400).json({message: 'Not Found!', success:true});
         } else {
-            res.send(foundUser);
+            res.status(200).json({
+                user: foundUser,
+                success: true
+            });
+        }
+    }).catch((err) => {
+        res.status(500).json({
+            error: err,
+            success: false
+        })
+    });
+});
+
+router.get(`/:id/lastseen`, (req, res) => {
+    //Validate User's ObjectID
+    if (!mongoose.isValidObjectId(req.params.id)) {
+        res.status(400).json({message: 'Invalid User ID', success: false});
+    }
+    //Making it async and using await == Using promise .then() and .catch()
+    User.findById(req.params.id).select('lastSeen')//.populate('product') -> shows details of field in blank (provided they are referenced)
+    .then((foundUser) => {
+        if (!foundUser) {//Analogous to .catch()
+            res.status(400).json({
+                message: 'Not Found!',
+                success: false
+            });
+        } else {
+            res.status(200).json({
+                user: foundUser,
+                success: true
+        });
         }
     }).catch((err) => {
         res.status(500).json({
@@ -75,8 +106,14 @@ router.get(`/:id`, (req, res) => {
 //API for GET to retrieve count statistics of number of Users
 router.get('/get/count', (req, res) => {
     User.estimatedDocumentCount(count => count) //use countDocuments() when you want to countDocuments by some filtered field
-    .then(value => res.status(200).send(value.toString()))
-    .catch(err => res.status(500).send(err));
+    .then(value => res.status(200).json({
+        count: value.toString(),
+        success: true
+    }))
+    .catch(err => res.status(500).json({
+        error: err,
+        success: false
+    }));
 });
 
 //API for Logins through POST
@@ -101,13 +138,14 @@ router.post(`/login`, async (req, res) => {
                 },
                 process.env.tokenSecret,
                 {
-                    expiresIn: '1d'//1d -> 1 day, 1w -> 1 week
+                    expiresIn: '1w'//1d -> 1 day, 1w -> 1 week
                 }
             );
             return res.status(200).json({
                 message: 'Logged in',
                 email: foundUser.email,
                 isAdmin: foundUser.isAdmin,
+                lastSeen: foundUser.lastSeen,
                 token: token,
                 success: true
             });
@@ -127,8 +165,12 @@ router.post(`/login`, async (req, res) => {
 //API for Registering New Users through POST
 //User registers into localhost:3000/api/v1/users/register/ with email to get authenticated
 router.post(`/register`, (req, res) => {
+<<<<<<< Updated upstream
     
     let userToRegister = typicalUser(req); //For this to work, the frontend must send JSON fields with the exact same labels
+=======
+    let userToRegister = typicalUser(req.body); //For this to work, the frontend must send JSON fields with the exact same labels
+>>>>>>> Stashed changes
 
     userToRegister
     .save()
@@ -209,10 +251,58 @@ router.put(`/:id`, (req, res) => {
             })
         } else {
             res.status(400).json({
-                success: false
+                message:'Could not update',success: false
             })
         }
     })
+    .catch((err) =>
+        res.status(500).json({
+            error: err,
+            success: false,
+        }));
+});
+
+//API for Updates (Put)
+router.put(`/:id/lastseen`, (req, res) => {
+    //Validate User's ObjectID
+    if (!mongoose.isValidObjectId(req.params.id)) {
+        res.status(400).json({
+            message: 'Invalid User ID',
+            success: false
+        });
+    //This line below is a reminder of how javascript is truly a moronic language - code to check if an object is a date object
+    // } else if (req.body.lastSeen.prototype.toString.call(date) !== '[object Date]') {
+    } 
+
+    User
+    .findByIdAndUpdate(
+        req.params.id, 
+        {
+            lastSeen: req.body.lastSeen
+        },
+        {
+            useFindAndModify: false,
+            returnOriginal: false
+        })
+    .then((user) => {
+        user
+        .save()
+        .then(user => user
+            ?
+            res.status(200).json({
+                user,
+                success: true})
+            :
+            res.status(400).json({
+                message: 'Could not update last seen',
+                success: false
+            })
+        .catch((err) =>
+            res.status(500).json({
+                error: err,
+                success: false,
+        }))
+        )})
     .catch((err) =>
         res.status(500).json({
             error: err,

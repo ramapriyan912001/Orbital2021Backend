@@ -46,7 +46,7 @@ const userSchema = mongoose.Schema(
         },
         lastSeen: {
             type: Date,
-            default: Date.now
+            default: ''
         },
         image: {
             type: String, //URL
