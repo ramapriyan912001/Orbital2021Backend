@@ -1,11 +1,11 @@
 function auth_error (err, req, res, next) {
     if (err.name === 'UnauthorizedError') {//Catch Unauthorized Errors
-        return res.status(401).json({
-            message: 'The user is unauthorized!!',
+        return res.status(400).json({
+            message: 'The user is unauthorized',
             success: false
         });
     } else if (err.name === 'ValidationError') {//Catch Validation Errors
-        return res.status(401).json({
+        return res.status(400).json({
             message: 'Invalid User',
             success: false
         });
