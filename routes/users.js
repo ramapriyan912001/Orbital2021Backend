@@ -165,12 +165,7 @@ router.post(`/login`, async (req, res) => {
 //API for Registering New Users through POST
 //User registers into localhost:3000/api/v1/users/register/ with email to get authenticated
 router.post(`/register`, (req, res) => {
-<<<<<<< Updated upstream
-    
-    let userToRegister = typicalUser(req); //For this to work, the frontend must send JSON fields with the exact same labels
-=======
-    let userToRegister = typicalUser(req.body); //For this to work, the frontend must send JSON fields with the exact same labels
->>>>>>> Stashed changes
+    let userToRegister = typicalUser(req.body); //For this to work, the frontend must send JSON fields with the exact same lab
 
     userToRegister
     .save()
