@@ -1,30 +1,11 @@
 //Import the Model and Express
-const _ = require('lodash');
 const express = require('express');
 const mongoose = require('mongoose');
-const {User} = require('../models/user');
-const bcrypt = require('bcryptjs');
+const {Match} = require('../models/match');
 const jwt = require('jsonwebtoken');
-const {chatRoom, Chatroom} = require('../models/chatroom')
 
 //Initialise the Router to create backend APIs
 const router = express.Router();
-
-//Factory method to construct Users
-const typicalUser = (req) => new User({
-    name: req.body.name,
-    dob: req.body.dob,
-    email: req.body.email,
-    passwordhash: bcrypt.hashSync(req.body.password, bcrypt.genSaltSync(4)),
-    isAdmin: req.body.isAdmin,
-    image: req.body.image,
-    diet: req.body.diet,
-    cuisine:  req.body.cuisine,
-    crossIndustry: req.body.crossIndustry,
-    isOnline: req.body.isOnline,
-    lastSeen: req.body.lastSeen,
-    chats: new Chatroom()
-});
 
 //API for GET
 //When we want to return ALL data from our MongoDB database, we need to use our Mongoose model and return .find()
@@ -37,12 +18,12 @@ router.get(`/`, (req, res) => {
     //     filter = {product: req.query.products.split(',')};//this part splits each entry of the query by comma and adds into an array, which is assigned to our filter
     // }
 
-    User.find(filter).select('-passwordhash')//Making it async and using await == Using promise .then() and .catch()
+    Match.find(filter).select('-passwordhash')//Making it async and using await == Using promise .then() and .catch()
     //.select() chooses the fields we want to send, e.g.  -dob -> don't send date of birth back
-    .then(foundUser => 
-        foundUser
-        ? res.status(200).json({user: foundUser, success:true})
-        : res.status(400).json({message: 'No records found', success: false})
+    .then(foundMatch => 
+        foundMatch
+        ? res.status(200).send(foundMatch)
+        : res.status(400).send('No records found')
     )
     .catch(err =>
         res.status(500).json({
@@ -53,47 +34,17 @@ router.get(`/`, (req, res) => {
 
 //API for GET to find by given ID
 router.get(`/:id`, (req, res) => {
-    //Validate User's ObjectID
+    //Validate Match's ObjectID
     if (!mongoose.isValidObjectId(req.params.id)) {
-        res.status(400).json({message: 'Invalid User ID',success: false});
+        res.status(400).send('Invalid Match ID');
     }
     //Making it async and using await == Using promise .then() and .catch()
-    User.findById(req.params.id).select('-passwordhash')//.populate('product') -> shows details of field in blank (provided they are referenced)
-    .then((foundUser) => {
-        if (!foundUser) {//Analogous to .catch()
-            res.status(400).json({message: 'Not Found!', success:true});
+    Match.findById(req.params.id).select('-passwordhash')//.populate('product') -> shows details of field in blank (provided they are referenced)
+    .then((foundMatch) => {
+        if (!foundMatch) {//Analogous to .catch()
+            res.status(400).send('Not Found!');
         } else {
-            res.status(200).json({
-                user: foundUser,
-                success: true
-            });
-        }
-    }).catch((err) => {
-        res.status(500).json({
-            error: err,
-            success: false
-        })
-    });
-});
-
-router.get(`/:id/lastseen`, (req, res) => {
-    //Validate User's ObjectID
-    if (!mongoose.isValidObjectId(req.params.id)) {
-        res.status(400).json({message: 'Invalid User ID', success: false});
-    }
-    //Making it async and using await == Using promise .then() and .catch()
-    User.findById(req.params.id).select('lastSeen')//.populate('product') -> shows details of field in blank (provided they are referenced)
-    .then((foundUser) => {
-        if (!foundUser) {//Analogous to .catch()
-            res.status(400).json({
-                message: 'Not Found!',
-                success: false
-            });
-        } else {
-            res.status(200).json({
-                user: foundUser,
-                success: true
-        });
+            res.send(foundMatch);
         }
     }).catch((err) => {
         res.status(500).json({
@@ -105,23 +56,17 @@ router.get(`/:id/lastseen`, (req, res) => {
 
 //API for GET to retrieve count statistics of number of Users
 router.get('/get/count', (req, res) => {
-    User.estimatedDocumentCount(count => count) //use countDocuments() when you want to countDocuments by some filtered field
-    .then(value => res.status(200).json({
-        count: value.toString(),
-        success: true
-    }))
-    .catch(err => res.status(500).json({
-        error: err,
-        success: false
-    }));
+    Match.estimatedDocumentCount(count => count) //use countDocuments() when you want to countDocuments by some filtered field
+    .then(value => res.status(200).send(value.toString()))
+    .catch(err => res.status(500).send(err));
 });
 
 //API for Logins through POST
 //User logs into localhost:process.env.PORT/api/v1/users/login/ with email to get authenticated
 router.post(`/login`, async (req, res) => {
-    const email = req.body.body.email;
-    if (email === undefined) {
-        return res.status(401).json({
+    const email = req.body.email;
+    console.log(email);
+    if (email === null) {res.status(401).json({
         'message': 'No Email Provided',
         success: false
     })};
@@ -131,13 +76,13 @@ router.post(`/login`, async (req, res) => {
     .then(foundUser => {
         if (!foundUser) {
             return res.status(401).json({//ERROR CODE 401 is for invalid email, 402 is Password
-                message: 'Invalid Email!',
+                message: 'Invalid Email',
                 success: false,
             })
         }
         //e-mail valid, authenticate password and issue jwt
 
-        if (foundUser && bcrypt.compareSync(req.body.body.password, foundUser.passwordhash)) {
+        if (foundUser && bcrypt.compareSync(req.body.password, foundUser.passwordhash)) {
             const token = jwt.sign(
                 {
                     userID: foundUser.id,
@@ -145,14 +90,13 @@ router.post(`/login`, async (req, res) => {
                 },
                 process.env.tokenSecret,
                 {
-                    expiresIn: '1w'//1d -> 1 day, 1w -> 1 week
+                    expiresIn: '1d'//1d -> 1 day, 1w -> 1 week
                 }
             );
             return res.status(200).json({
                 message: 'Logged in',
                 email: foundUser.email,
                 isAdmin: foundUser.isAdmin,
-                lastSeen: foundUser.lastSeen,
                 token: token,
                 success: true
             });
@@ -172,7 +116,7 @@ router.post(`/login`, async (req, res) => {
 //API for Registering New Users through POST
 //User registers into localhost:3000/api/v1/users/register/ with email to get authenticated
 router.post(`/register`, (req, res) => {
-    let userToRegister = typicalUser(req.body); //For this to work, the frontend must send JSON fields with the exact same lab
+    let userToRegister = typicalUser(req); //For this to work, the frontend must send JSON fields with the exact same labels
 
     userToRegister
     .save()
@@ -200,18 +144,18 @@ router.post(`/register`, (req, res) => {
 router.delete(`/:id`, (req, res) => {
     //Validate User's ObjectID
     if (!mongoose.isValidObjectId(req.params.id)) {
-        res.status(400).send('Invalid User ID');
+        res.status(400).send('Invalid Match ID');
     }
-    User.findByIdAndDelete(req.params.id).then((user) => {
+    Match.findByIdAndDelete(req.params.id).then((user) => {
         if (user) {
             res.status(201).json({
                 success: true,
-                message: "User is deleted"
+                message: "Match is deleted"
             });
         } else {
             res.status(404).json({
                 success: false,
-                message: "User not found"
+                message: "Match not found"
             })};
         }).catch(err => res.status(500).json({
                 success: false,
@@ -223,10 +167,10 @@ router.delete(`/:id`, (req, res) => {
 router.put(`/:id`, (req, res) => {
     //Validate User's ObjectID
     if (!mongoose.isValidObjectId(req.params.id)) {
-        res.status(400).send('Invalid User ID');
+        res.status(400).send('Invalid Match ID');
     }
 
-    User
+    Match
     .findByIdAndUpdate(
         req.params.id, 
         {
@@ -253,58 +197,10 @@ router.put(`/:id`, (req, res) => {
             })
         } else {
             res.status(400).json({
-                message:'Could not update',success: false
+                success: false
             })
         }
     })
-    .catch((err) =>
-        res.status(500).json({
-            error: err,
-            success: false,
-        }));
-});
-
-//API for Updates (Put)
-router.put(`/:id/lastseen`, (req, res) => {
-    //Validate User's ObjectID
-    if (!mongoose.isValidObjectId(req.params.id)) {
-        res.status(400).json({
-            message: 'Invalid User ID',
-            success: false
-        });
-    //This line below is a reminder of how javascript is truly a moronic language - code to check if an object is a date object
-    // } else if (req.body.lastSeen.prototype.toString.call(date) !== '[object Date]') {
-    } 
-
-    User
-    .findByIdAndUpdate(
-        req.params.id, 
-        {
-            lastSeen: req.body.lastSeen
-        },
-        {
-            useFindAndModify: false,
-            returnOriginal: false
-        })
-    .then((user) => {
-        user
-        .save()
-        .then(user => user
-            ?
-            res.status(200).json({
-                user,
-                success: true})
-            :
-            res.status(400).json({
-                message: 'Could not update last seen',
-                success: false
-            })
-        .catch((err) =>
-            res.status(500).json({
-                error: err,
-                success: false,
-        }))
-        )})
     .catch((err) =>
         res.status(500).json({
             error: err,

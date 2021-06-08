@@ -6,7 +6,7 @@ function authJwt() {
     return expressjwt({
         secret,
         algorithms: ['HS256'],
-        isRevoked: isRevoked,
+        // isRevoked: isRevoked, //-> WE WILL ALLOW ADMIN FUNCTIONS BY DECODING JWT AND VERIFYINIG AT FRONTEND, THIS WAY IS NOT SCALABLE. IT BASICALLY BLOCKS ANY REQUEST FROM USER THAT ARE NOT ADMIN
     })
     .unless({
         path: [
