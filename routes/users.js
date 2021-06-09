@@ -1,5 +1,4 @@
 //Import the Model and Express
-const _ = require('lodash');
 const express = require('express');
 const mongoose = require('mongoose');
 const {User} = require('../models/user');
