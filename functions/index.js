@@ -9,20 +9,24 @@ const {
   deleteUserByUID,
   deleteUsersByUID,
   createAuthUser,
-  updateFullAuthUser
+  updateFullAuthUser,
+  promoteToAdmin
 } = require('./handlers/Users');
 
 // // Create and Deploy Your First Cloud Functions
 // // https://firebase.google.com/docs/functions/write-firebase-functions
-//
-exports.helloWorld = functions.https.onRequest((request, response) => {
-  functions.logger.info("Hello logs!", {structuredData: true});
-  response.send("Hello from Firebase!");
-});
+// //
+// exports.helloWorld = functions.https.onRequest((request, response) => {
+//   functions.logger.info("Hello logs!", {structuredData: true});
+//   response.send("Hello from Firebase!");
+// });
 
-App.post('/createAuth', createAuthUser);
-App.put('/updateAuth/:uid', updateFullAuthUser);
-App.post('/deleteUser/:uid', deleteUserByUID);
-App.post('/deleteUsers', deleteUsersByUID);//Pass List of UIDs in req.body.body
+// App.post('/createAuth', createAuthUser);
+// App.put('/updateAuth/:uid', updateFullAuthUser);
+// App.post('/deleteUser/:uid', deleteUserByUID);
+// App.post('/deleteUsers', deleteUsersByUID);//Pass List of UIDs in req.body.body
 
-exports.api = functions.region('us-central1').https.onRequest(App);
+// exports.api = functions.region('us-central1').https.onRequest(App);
+exports.deleteUser = functions.https.onCall(deleteUserByUID);
+exports.deleteUsers = functions.https.onCall(deleteUsersByUID);
+exports.promoteUserToAdmin = functions.https.onCall(promoteToAdmin);
