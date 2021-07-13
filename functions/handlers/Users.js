@@ -185,10 +185,10 @@ exports.deleteUsersByUID = (data, context) => {
     return admin
     .auth()
     .verifyIdToken(idToken, checkRevoked)
-    .then((payload) => {
-        console.log('Payload: ', payload);
+    .then((claims) => {
+        console.log('Claims: ', claims);
         // Token is valid.
-        if (payload.claims == null||(!payload.claims.admin)) {
+        if (claims == null||(!claims.admin)) {
             return ({
                 success: false,
                 message: `Calling User does not have Admin Permissions`
@@ -261,7 +261,7 @@ exports.promoteToAdmin = (data, context) => {
     .auth()
     .getUser(uid)
     .then((userRecord) => {
-        if (userRecord.customClaims && userRecord.customClaims.admin) {
+        if (userRecord.customClaims && userRecord.customClaims['admin']) {
             console.log('User is already admin, do nothing');
             return ({
                 success: false,
@@ -271,9 +271,19 @@ exports.promoteToAdmin = (data, context) => {
             return admin
             .auth()
             .setCustomUserClaims(uid, {admin: true})
-            .then(() => {
+            .then(async () => {
                 // The new custom claims will propagate to the user's ID token the
                 // next time a new one is issued.
+                
+                // Lookup the user associated with the specified uid.
+                await admin
+                .auth()
+                .getUser(uid)
+                .then((userRecord) => {
+                // The claims can be accessed on the user record.
+                console.log('Custom Claims: ', userRecord.customClaims);
+                });
+
                 return ({
                     success: true,
                     message: `Congratulations! ${userRecord.displayName} is now an admin`
