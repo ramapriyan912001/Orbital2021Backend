@@ -1,11 +1,13 @@
 const firebase = require("firebase");
 const {admin} = require("../utils/admin");
 const functions = require('firebase-functions')
-// require("dotenv/config");
+require("dotenv/config");
 // const { adminConfig } = require(process.env.SERVICE_PATH);
-
+const {Expo} = require('expo-server-sdk')
 const { config } = require("../utils/config");
 firebase.initializeApp(config);
+
+let expo = new Expo({accessToken: process.env.EXPO_ACCESS_TOKEN})
 
 const userExists = (uid) => admin.auth().getUser(uid).then(user => true).catch(err => false);
 const isAdmin = () => {
