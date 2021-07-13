@@ -11,6 +11,7 @@ const {
   createAuthUser,
   updateFullAuthUser,
   promoteToAdmin,
+  addPushTokenToDatabase,
 } = require('./handlers/Users');
 
 // // Create and Deploy Your First Cloud Functions
@@ -30,8 +31,9 @@ const {
 exports.deleteUser = functions.https.onCall(deleteUserByUID);
 exports.deleteUsers = functions.https.onCall(deleteUsersByUID);
 exports.promoteUserToAdmin = functions.https.onCall(promoteToAdmin);
+exports.addPushTokenToDatabase = functions.https.onCall(addPushTokenToDatabase)
 exports.scheduleFunction = functions.pubsub.schedule('* * * * *').onRun((context) => {
-  let updates = {}
+  let updates = {};
   updates['/time'] = Math.random();
   admin.database().ref().update(updates);
   console.log('This will be run every minute!');
