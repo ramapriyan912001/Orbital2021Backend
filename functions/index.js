@@ -12,8 +12,11 @@ const {
   updateFullAuthUser,
   promoteToAdmin,
   addPushTokenToDatabase,
-  matchDecline
 } = require('./handlers/Users');
+
+const {
+  matchDecline
+} = require('./handlers/Matches')
 
 // // Create and Deploy Your First Cloud Functions
 // // https://firebase.google.com/docs/functions/write-firebase-functions
