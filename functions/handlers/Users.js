@@ -113,13 +113,23 @@ exports.addPushTokenToDatabase = (data, context) => {
         .database()
         .ref()
         .update(updates)
-        .then(res => {
-            return {
+        .then(res => ({
                 success: true,
                 message: 'PushToken Successfully Uploaded'
-            }
-        }).catch(err => console.log(err))
-    }).catch(e => console.log(e))
+        })).catch(err => {
+            console.log(err.message);
+            return ({
+                success: false,
+                message: `ADMIN UPDATE DB ERROR: ${err.message}`
+            });
+        })
+    }).catch(err =>{
+        console.log(err.message);
+        return ({
+            success: false,
+            message: `ADMIN VERIFY TOKEN ERROR: ${err.message}`
+        });
+    });
 }
 
 exports.deleteUserByUID = (data, context) => {
