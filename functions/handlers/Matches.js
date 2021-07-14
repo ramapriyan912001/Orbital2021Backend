@@ -15,7 +15,8 @@ const {
   obtainStatusOfPendingMatch,
   userRef,
   calculateDistance,
-  DIETARY_ARRAYS
+  DIETARY_ARRAYS,
+  linkChats,
 } = require('./MatchingHelpers')
 
 exports.findGobbleMate = async(data, context) => {
@@ -217,7 +218,7 @@ exports.matchDecline = async(data, context) => {
               }
 }
 
-exports.matchFinalise = async(data, context) => {
+async function matchFinalise(data, context) {
   let request = data.request;
   let updates = {};
   let otherUserRequest = await firebase.database().ref(`/Users/${request.otherUserId}/pendingMatchIDs/${request.matchID}`)
