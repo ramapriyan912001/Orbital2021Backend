@@ -4,7 +4,7 @@ const functions = require('firebase-functions')
 const { config } = require("../utils/config");
 const fetcher = require('node-fetch')
 
-firebase.initializeApp(config);
+// firebase.initializeApp(config);
 
 exports.DIETARY_ARRAYS = {//was Bug
     "Vegetarian": ["Vegetarian", 'Vegan', "ANY"],

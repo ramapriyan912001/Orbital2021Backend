@@ -15,7 +15,9 @@ const {
 } = require('./handlers/Users');
 
 const {
-  matchDecline
+  matchDecline,
+  matchConfirm,
+  findGobbleMate
 } = require('./handlers/Matches')
 
 // // Create and Deploy Your First Cloud Functions
@@ -37,6 +39,8 @@ exports.deleteUsers = functions.https.onCall(deleteUsersByUID);
 exports.promoteUserToAdmin = functions.https.onCall(promoteToAdmin);
 exports.addPushTokenToDatabase = functions.https.onCall(addPushTokenToDatabase)
 exports.matchDecline = functions.https.onCall(matchDecline)
+exports.matchConfirm = functions.https.onCall(matchConfirm)
+exports.findGobbleMate = functions.https.onCall(findGobbleMate)
 // exports.scheduleFunction = functions.pubsub.schedule('* * * * *').onRun((context) => {
 //   let updates = {};
 //   updates['/time'] = Math.random();
