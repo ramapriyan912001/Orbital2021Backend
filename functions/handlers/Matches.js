@@ -5,7 +5,6 @@ const {
   getDistance,
   getThreshold,
   makeDateString,
-  isBlocked,
   convertTimeToMinutes,
   gobbleRequestsRef,
   getUserDetails,
@@ -52,6 +51,20 @@ exports.findGobbleMate = async(data, context) => {
           distance2 = getDistance(child)
           date2 = getDatetime(child)
           time2 = convertTimeToMinutes(date2)
+          //It's strange but isBlocked is not recognized if imported
+          // from helpers
+          // This is a hackish way of having it be recognised.
+          const isBlocked = async(uid, otherUid) => {
+            let x = false;
+            x = await admin.database().ref(`Users/${uid}/blockedUsers/${otherUid}`)
+            .once("value")
+            .then(snapshot => {
+              return snapshot.val() ? true : false}
+              )
+            .catch(err => console.log(err)
+            )
+            return x;
+          }
           let isBlocked1 = await isBlocked(request.userId, child.userId)
           let isBlocked2 = await isBlocked(child.userId, request.userId)
           let isBlocked = isBlocked1 || isBlocked2
