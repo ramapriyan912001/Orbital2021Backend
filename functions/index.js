@@ -12,6 +12,7 @@ const {
   updateFullAuthUser,
   promoteToAdmin,
   addPushTokenToDatabase,
+  matchDecline
 } = require('./handlers/Users');
 
 // // Create and Deploy Your First Cloud Functions
@@ -32,6 +33,7 @@ exports.deleteUser = functions.https.onCall(deleteUserByUID);
 exports.deleteUsers = functions.https.onCall(deleteUsersByUID);
 exports.promoteUserToAdmin = functions.https.onCall(promoteToAdmin);
 exports.addPushTokenToDatabase = functions.https.onCall(addPushTokenToDatabase)
+exports.matchDecline = functions.https.onCall(matchDecline)
 // exports.scheduleFunction = functions.pubsub.schedule('* * * * *').onRun((context) => {
 //   let updates = {};
 //   updates['/time'] = Math.random();

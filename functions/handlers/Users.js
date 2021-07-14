@@ -327,4 +327,52 @@ exports.promoteToAdmin = (data, context) => {
     }));
 };
 
+exports.matchDecline = (data, context) => {
+    const {Expo} = require("expo-server-sdk")
+    let expo = new Expo();
+    let request = data.request;
+    let tickets = [];
+    let messages = [];
+    return admin
+    .auth()
+    .verifyIdToken(data.idToken)
+    .then(decodedToken => {
+        const uid = decodedToken.uid;
+        // add a check?
+        let updates = {}
+        updates[`/Users/${request.userId}/pendingMatchIDs/${request.matchID}`] = null
+        updates[`/Users/${request.otherUserId}/pendingMatchIDs/${request.matchID}`] = null
+        updates[`/UserRequests/${request.userId}/${request.matchID}`] = null;
+        updates[`/UserRequests/${request.otherUserId}/${request.matchID}`] = null;
+        updates[`/PendingMatchIDs/${request.matchID}`] = null
+            // console.log('Updates',updates);
+        admin
+        .database()
+        .ref()
+        .update(updates)
+        .then(res => {
+            admin
+            .database()
+            .ref(`PushTokens/${request.otherUserId}`)
+            .once("value")
+            .then(snapshot => {
+                let pushToken = snapshot.val();
+                messages.push({
+                    to: pushToken,
+                    sound: 'default',
+                    title: 'Your match has been declined.',
+                    body: 'Create another Gobble to find another match!',
+                    data: { withSome: 'data' },
+                })
+                let chunks = expo.chunkPushNotifications(messages)
+                for(let chunk of chunks) {
+                    let ticket = expo.sendPushNotificationsAsync(chunk)
+                    tickets.push(ticket);
+                }
+                console.log(tickets);
+            })
+        });
+    }).catch(err => console.log('Match Confirm Error: ' + err.message))
+}
+
 // module.exports({ deleteUserByUID, deleteUsersByUID, createAuthUser, updateFullAuthUser });
