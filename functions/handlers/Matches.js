@@ -1,68 +1,26 @@
-async function isBlocked(uid, otherUid) {
-    let x = false;
-    x = await admin.database().ref(`Users/${uid}/blockedUsers/${otherUid}`)
-    .once("value")
-    .then(snapshot => {
-      return snapshot.val() ? true : false}
-      )
-    .catch(err => console.log(err)
-    )
-    return x;
-}
 
-/**
-   * Calculate distance between two users using coordinates provided
-   * @param {*} coords1 coordinates of first user's location
-   * @param {*} coords2 coordinates of second user's location
-   * @returns the distance between the two users via a number value
-   */
- function calculateDistance(coords1, coords2) {
-    let lat1 = coords1['latitude']
-    let lat2 = coords2['latitude']
-    let lon1 = coords1['longitude']
-    let lon2 = coords2['longitude']
-    var p = 0.017453292519943295;    // Math.PI / 180
-    var c = Math.cos;
-    var a = 0.5 - c((lat2 - lat1) * p)/2 + 
-            c(lat1 * p) * c(lat2 * p) * 
-            (1 - c((lon2 - lon1) * p))/2;
-  
-    const distance = 12742 * Math.asin(Math.sqrt(a)); // 2 * R; R = 6371 km
-    return distance;
-}
+const {
+  getCoords,
+  getDatetime,
+  getDistance,
+  getThreshold,
+  makeDateString,
+  isBlocked,
+  convertTimeToMinutes,
+  gobbleRequestsRef,
+  getUserDetails,
+  getUserCollection,
+  measureCompatibility,
+  isWithinRange,
+  isWithinTime,
+  obtainStatusOfPendingMatch,
+  userRef,
+  calculateDistance,
+  DIETARY_ARRAYS
+} = require('./MatchingHelpers')
 
-function isWithinRange(coords1, distance1, coords2, distance2) {
-    return (distance1 + distance2) >= calculateDistance(coords1, coords2)
-}
-
-/**
-   * Evaluates if two users are compatible based on their match times
-   * @param {*} time1 Preferred time of first user request
-   * @param {*} time2 Preferred time of second user request
-   * @returns Boolean
-   */
-function isWithinTime(time1, time2) {
-    return (Math.abs(time1-time2) <= 30)   
-}
-
-/**
-   * Threshold for when matching algorithm can stop and return
-   * This is supposed to be dynamic
-   * Will be improved in phase 3
-   * @param {*} request request sent by user
-   * @returns a score number value
-   */
-function getThreshold(request) {
-    // Will have a threshold function to mark how low a score we are willing to accept for a match
-    // Nearer to the schedule time, the lower the threshold
-    // This is for milestone 3
-    // For now we just have a threshold of 18 points
-    return 18;
-}
-
-async function findGobbleMate(request) {
-    console.log('Finding a match');
-    console.log(request)
+exports.findGobbleMate = async(data, context) => {
+    let request = data.request;
     let date1 = getDatetime(request)
     let ref = gobbleRequestsRef()
     .child(makeDateString(date1))
@@ -182,94 +140,93 @@ async function findGobbleMate(request) {
       // Maybe we need to create another table of just user + profile pic so we don't need to load a lot of data every time
 }
 
-/**
-   * Getter for user details
-   * @param {*} id user id
-   * @returns user object
-   */
-async function getUserDetails(id) {
-    return getUserCollection(id, snapshot => snapshot.val(), err => console.log(err))
-}
-
-const getUserCollection = (id, success, failure) => id != null
-                                                ? userRef(id)
-                                                  .once('value')
-                                                  .then(success)
-                                                  .catch(failure)
-                                                : failure({code: 'auth/invalid-id', message: 'Invalid UID provided'});
-
-/**
-   * Get the reference to object within the GobbleRequests object within the database
-   * @param {*} params id of object
-   * @returns reference
-   */
-function gobbleRequestsRef() {
-    return admin.database().ref(`GobbleRequests`)
-}
-
-/**
-   * Get the reference to user object within the users object within the database
-   * @param {*} params id of object
-   * @returns reference
-   */
-function userRef(params) {
-    return admin.database().ref(`Users/${params}`);
-}
-
-  /**
-   * Converts the date object into a readable string
-   * So that it can be stored in the database easily
-   * @param {*} date Date object
-   * @returns String of date
-   */
-function makeDateString(date) {
-    return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-}
-
-  /**
-   * Get coordinates of the user's location
-   * @param {*} request match request sent by user searching for gobble
-   * @returns 
-   */
-function getCoords(request) {
-    return request['location']['coords']
-}
-
-  /**
-   * Get datetime string from request sent by user
-   * @param {*} request match request sent by user searching for gobble
-   * @returns 
-   */
-function getDatetime(request) {
-    console.log(request)
-    return new Date(request['datetime'])
-}
-
-  /**
-   * Get preferred distance for meal from request sent by user
-   * @param {*} request match request sent by user searching for gobble
-   * @returns 
-   */
-function getDistance(request) {
-    return request['distance']
-}
-
-  /**
-   * Convert time into minutes to easily evaluate time difference
-   * @param {*} date date object
-   * @returns 
-   */
-function convertTimeToMinutes(date) {
-    return date.getHours()*60 + date.getMinutes()
-}
-
-function measureCompatibility(request1, request2) {
-    let compatibility = 0;
-    if(request1.cuisinePreference == request2.cuisinePreference) {
-      compatibility += 5;
+exports.matchConfirm = async (data, context) => {
+  let request = data.request;
+  let result = await firebase.database().ref(`/PendingMatchIDs/${request.matchID}/${request.otherUserId}`)
+  .once("value")
+  .then(snapshot => snapshot.val())
+  if(result) {
+    return matchFinalise(request)
+  } else {
+    let updates = {}
+    updates[`/PendingMatchIDs/${request.matchID}/${request.userId}`] = true;
+    try{
+      // console.log('Updates',updates);
+      await admin.database().ref().update(updates);
+      return {
+          success: true,
+          message: 'CONFIRM_SUCCESS'
+      }
+    } catch(err) {
+      console.log('Match Confirm Error:', err.message);
+      return {
+          success: false,
+          message: 'CONFIRM_FAILURE'
+      }
     }
-    if(request1.industryPreference == 12 || (request1.industryPreference == request2.industry)) {
-      compatibility += 5;
-    }
-    return compatibility;
+  }
+}
+
+exports.matchDecline = async(data, context) => {
+  let request = data.request;
+  let uid = admin
+  .auth()
+  .verifyIdToken(data.idToken)
+  .then(decodedToken => {
+      return decodedToken.uid;
+  })
+      // add a check?
+      let updates = {}
+      updates[`/Users/${request.userId}/pendingMatchIDs/${request.matchID}`] = null
+      updates[`/Users/${request.otherUserId}/pendingMatchIDs/${request.matchID}`] = null
+      updates[`/UserRequests/${request.userId}/${request.matchID}`] = null;
+      updates[`/UserRequests/${request.otherUserId}/${request.matchID}`] = null;
+      updates[`/PendingMatchIDs/${request.matchID}`] = null
+      await admin.database().ref().update(updates)
+      let pushToken = await admin.database().ref(`PushTokens/${request.otherUserId}`).once("value")
+          .then(snapshot => {
+              return snapshot.val();
+          })
+      let response = await fetcher('https://exp.host/--/api/v2/push/send', {
+                  body: JSON.stringify({
+                    to: pushToken,
+                    title: "Oh No! Your match has been declined!",
+                    body: "Please schedule another match!",
+                  }),
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  method: 'POST',
+              });
+              return {
+                  success: true,
+                  message: response
+              }
+}
+
+exports.matchFinalise = async(data, context) => {
+  let request = data.request;
+  let updates = {};
+  let request2UserDetails = await this.getUserDetails(request.otherUserId)
+  let request1UserDetails = await this.getUserDetails(request.userId)
+  let otherUserRequest = await firebase.database().ref(`/Users/${request.otherUserId}/pendingMatchIDs/${request.matchID}`)
+  .once("value")
+  .then(snapshot => snapshot.val())
+
+  updates[`/Users/${request.userId}/matchIDs/${request.matchID}`] = request
+  updates[`/Users/${request.otherUserId}/matchIDs/${request.matchID}`] = otherUserRequest
+
+  updates[`/PendingMatchIDs/${request.matchID}`] = null
+  updates[`/Users/${request.userId}/pendingMatchIDs/${request.matchID}`] = null
+  updates[`/Users/${request.otherUserId}/pendingMatchIDs/${request.matchID}`] = null
+
+  updates = await this.linkChats(updates, request, otherUserRequest);
+  try{
+    // console.log('Updates',updates);
+    await firebase.database().ref().update(updates);
+    return FINAL_SUCCESS;
+  } catch(err) {
+    console.log('Match Confirm Error:', err.message);
+    return FINAL_FAIL;
+  }
 }

@@ -5,6 +5,8 @@ const functions = require('firebase-functions')
 // const { adminConfig } = require(process.env.SERVICE_PATH);
 // const {Expo} = require('expo-server-sdk')
 const { config } = require("../utils/config");
+const fetcher = require('node-fetch')
+
 firebase.initializeApp(config);
 
 // let expo = new Expo({accessToken: process.env.EXPO_ACCESS_TOKEN})
@@ -327,17 +329,41 @@ exports.promoteToAdmin = (data, context) => {
     }));
 };
 
-exports.matchDecline = (data, context) => {
-    const {Expo} = require("expo-server-sdk")
-    let expo = new Expo();
+exports.matchConfirm = async (data, context) => {
     let request = data.request;
-    let tickets = [];
-    let messages = [];
-    return admin
+    let result = await firebase.database().ref(`/PendingMatchIDs/${request.matchID}/${request.otherUserId}`)
+    .once("value")
+    .then(snapshot => snapshot.val())
+    if(result) {
+      return matchFinalise(request)
+    } else {
+      let updates = {}
+      updates[`/PendingMatchIDs/${request.matchID}/${request.userId}`] = true;
+      try{
+        // console.log('Updates',updates);
+        await admin.database().ref().update(updates);
+        return {
+            success: true,
+            message: 'CONFIRM_SUCCESS'
+        }
+      } catch(err) {
+        console.log('Match Confirm Error:', err.message);
+        return {
+            success: false,
+            message: 'CONFIRM_FAILURE'
+        }
+      }
+    }
+  }
+
+exports.matchDecline = async(data, context) => {
+    let request = data.request;
+    let uid = admin
     .auth()
     .verifyIdToken(data.idToken)
     .then(decodedToken => {
-        const uid = decodedToken.uid;
+        return decodedToken.uid;
+    })
         // add a check?
         let updates = {}
         updates[`/Users/${request.userId}/pendingMatchIDs/${request.matchID}`] = null
@@ -345,34 +371,26 @@ exports.matchDecline = (data, context) => {
         updates[`/UserRequests/${request.userId}/${request.matchID}`] = null;
         updates[`/UserRequests/${request.otherUserId}/${request.matchID}`] = null;
         updates[`/PendingMatchIDs/${request.matchID}`] = null
-            // console.log('Updates',updates);
-        admin
-        .database()
-        .ref()
-        .update(updates)
-        .then(res => {
-            admin
-            .database()
-            .ref(`PushTokens/${request.otherUserId}`)
-            .once("value")
+        await admin.database().ref().update(updates)
+        let pushToken = await admin.database().ref(`PushTokens/${request.otherUserId}`).once("value")
             .then(snapshot => {
-                let pushToken = snapshot.val();
-                messages.push({
-                    to: pushToken,
-                    sound: 'default',
-                    title: 'Your match has been declined.',
-                    body: 'Create another Gobble to find another match!',
-                    data: { withSome: 'data' },
-                })
-                let chunks = expo.chunkPushNotifications(messages)
-                for(let chunk of chunks) {
-                    let ticket = expo.sendPushNotificationsAsync(chunk)
-                    tickets.push(ticket);
-                }
-                console.log(tickets);
+                return snapshot.val();
             })
-        });
-    }).catch(err => console.log('Match Confirm Error: ' + err.message))
+        let response = await fetcher('https://exp.host/--/api/v2/push/send', {
+                    body: JSON.stringify({
+                      to: pushToken,
+                      title: "Oh No! Your match has been declined!",
+                      body: "Please schedule another match!",
+                    }),
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    method: 'POST',
+                });
+                return {
+                    success: true,
+                    message: response
+                }
 }
 
 // module.exports({ deleteUserByUID, deleteUsersByUID, createAuthUser, updateFullAuthUser });
