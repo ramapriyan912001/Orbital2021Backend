@@ -101,8 +101,7 @@ exports.findGobbleMate = async(data, context) => {
           match(request, null, bestMatch, dietaryRef)
           return true;
         } else {
-        //   console.log('No match found! Creating new entry');
-        //   this.makeGobbleRequest(ref, request, date1)
+              makeGobbleRequest(ref, request, date1)
           return false;
         }
     }
@@ -152,6 +151,23 @@ exports.findGobbleMate = async(data, context) => {
     }
       // TODO: What if the user changes his/her profile picture?
       // Maybe we need to create another table of just user + profile pic so we don't need to load a lot of data every time
+}
+
+/**
+ * Function called when match is not instantly found
+ * Pending match ID generated and added to the pile
+ * @param {*} ref Reference of date object within GobbleRequests object
+ * @param {*} request Request sent by user searching for gobble
+ * @param {*} date Date object of request
+ */
+function makeGobbleRequest(ref, request, date) {
+    const matchID = ref.child(`${request.dietaryRestriction}`).push().key;
+    let updates = {};
+    updates[`/Users/${request.userId}/awaitingMatchIDs/${matchID}`] = {...request, matchID: matchID};
+    updates[`/GobbleRequests/${makeDateString(date)}/${request.dietaryRestriction}/${matchID}`] = {...request, matchID: matchID};
+    updates[`/UserRequests/${request.userId}/${matchID}`] = request.datetime;
+    // Add more updates here
+    admin.database().ref().update(updates);
 }
 
 exports.matchConfirm = async (data, context) => {
@@ -240,5 +256,17 @@ async function matchFinalise(data, context) {
   } catch(err) {
     console.log('Match Confirm Error:', err.message);
     return FINAL_FAIL;
+  }
+}
+
+exports.matchUnaccept = async(request) => {
+  let updates = {}
+  updates[`/PendingMatchIDs/${request.matchID}/${request.userId}`] = false;
+  try{
+    await admin.database().ref().update(updates);
+    return UNACCEPT_SUCCESS
+  } catch(err) {
+    console.log('Match Confirm Error:', err.message);
+    return UNACCEPT_FAIL
   }
 }
