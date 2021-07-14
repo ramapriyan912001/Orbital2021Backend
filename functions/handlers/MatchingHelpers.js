@@ -105,11 +105,6 @@ exports.measureCompatibility = (request1, request2) => {
     }
     return compatibility;
 }
-exports.obtainStatusOfPendingMatch = async(matchID) => {
-  return admin.database().ref(`/PendingMatchIDs/${matchID}/${this.uid}`)
-  .once("value")
-  .then(snapshot => snapshot.val())
-}
 
 exports.isBlocked = async(uid, otherUid) => {
     let x = false;
@@ -171,4 +166,71 @@ exports.getThreshold = (request) => {
     // This is for milestone 3
     // For now we just have a threshold of 18 points
     return 18;
+}
+
+/**
+   * Asynchronously create a chat for matched users
+   */
+exports.linkChats = async(updates, req1, req2) => {
+    //Adding to Chats Table
+    //If the User has never been matched before, add a new entry in each User's ref under this table
+    //If they have been matched before, update matchDateTime
+    let isNewMatch = false;
+    await chatsRef(`${req1.userId}/${req2.userId}`)
+                          .once('value', snapshot => {isNewMatch = !snapshot.exists()});
+
+    if (isNewMatch == null){
+      //Do Nothing
+      console.log('Nothing is done to link chats');
+    } else { 
+      if (isNewMatch) {
+        const conversationID = await conversationRef().push().key;  
+        updates[`/Chats/${req1.userId}/${req2.userId}/metadata`] = {
+                                                            _id: req1.userId,
+                                                            name: req1.otherUserName,
+                                                            avatar: req2.otherUserAvatar,
+                                                            otherUserId: req2.userId,
+                                                            industry: req2.industry,
+                                                            otherUserAvatar: req1.otherUserAvatar,
+                                                            lastMessage: '',
+                                                            conversation: conversationID,
+                                                            matchDateTime: req1.datetime,
+                                                          };
+        updates[`/Chats/${req2.userId}/${req1.userId}/metadata`] = {
+                                                            _id: req2.userId,
+                                                            name: req2.otherUserName,
+                                                            avatar: req1.otherUserAvatar,
+                                                            otherUserId: req1.userId,
+                                                            industry: req1.industry,
+                                                            otherUserAvatar: req2.otherUserAvatar,
+                                                            lastMessage: '',
+                                                            conversation: conversationID,
+                                                            matchDateTime: req1.datetime,
+                                                          };
+      } else {
+        updates[`/Chats/${req1.userId}/${req2.userId}/metadata/matchDateTime`] = req1.datetime;
+        updates[`/Chats/${req2.userId}/${req1.userId}/metadata/matchDateTime`] = req1.datetime;
+      }
+    }
+    return updates;
+          // .then (x => x)
+          // .catch(err => console.log('Linking Chats Error:', err.message));
+}
+
+/**
+   * Get the reference to object within the chats object within the database
+   * @param {*} params id of object
+   * @returns reference
+   */
+function chatsRef(params) {
+    return admin.database().ref(`Chats/${params}`);
+}
+
+/**
+   * Get the reference to chat object within the conversation object within the database
+   * @param {*} params id of object
+   * @returns reference
+   */
+function conversationRef(params) {
+    return admin.database().ref(`Conversation/${params}`);
 }

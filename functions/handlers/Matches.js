@@ -220,8 +220,6 @@ exports.matchDecline = async(data, context) => {
 exports.matchFinalise = async(data, context) => {
   let request = data.request;
   let updates = {};
-  let request2UserDetails = await this.getUserDetails(request.otherUserId)
-  let request1UserDetails = await this.getUserDetails(request.userId)
   let otherUserRequest = await firebase.database().ref(`/Users/${request.otherUserId}/pendingMatchIDs/${request.matchID}`)
   .once("value")
   .then(snapshot => snapshot.val())
@@ -233,7 +231,7 @@ exports.matchFinalise = async(data, context) => {
   updates[`/Users/${request.userId}/pendingMatchIDs/${request.matchID}`] = null
   updates[`/Users/${request.otherUserId}/pendingMatchIDs/${request.matchID}`] = null
 
-  updates = await this.linkChats(updates, request, otherUserRequest);
+  updates = await linkChats(updates, request, otherUserRequest);
   try{
     // console.log('Updates',updates);
     await firebase.database().ref().update(updates);
