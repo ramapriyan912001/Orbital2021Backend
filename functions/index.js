@@ -43,14 +43,3 @@ exports.matchDecline = functions.https.onCall(matchDecline)
 exports.matchConfirm = functions.https.onCall(matchConfirm)
 exports.findGobbleMate = functions.https.onCall(findGobbleMate)
 exports.matchUnaccept = functions.https.onCall(matchUnaccept)
-// exports.scheduledMatchingFunctions = functions.pubsub.schedule('*/10 * * * *').onRun((context) => {
-// })
-
-
-// exports.scheduleFunction = functions.pubsub.schedule('* * * * *').onRun((context) => {
-//   let updates = {};
-//   updates['/time'] = Math.random();
-//   admin.database().ref().update(updates);
-//   console.log('This will be run every minute!');
-//   return null;
-// });
