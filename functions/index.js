@@ -6,6 +6,12 @@ const App = express();
 // App.use(cors());
 
 const {
+  makeDateString,
+  findingNearestQuarterTime,
+  makeDateTimeString
+} = require('./handlers/MatchingHelpers')
+
+const {
   deleteUserByUID,
   deleteUsersByUID,
   createAuthUser,
@@ -45,6 +51,57 @@ exports.findGobbleMate = functions.https.onCall(findGobbleMate)
 exports.matchUnaccept = functions.https.onCall(matchUnaccept)
 // exports.scheduledMatchingFunctions = functions.pubsub.schedule('*/10 * * * *').onRun((context) => {
 // })
+exports.scheduleAwaitingCleanUpFunction = functions.pubsub.schedule('1-59/15 * * * *').onRun(async(context) => {
+  let updates = {}
+  let now = new Date();
+  now.setMinutes(findingNearestQuarterTime(now))
+  let todayString = makeDateString(now);
+  let todayTimeString = makeDateTimeString(now)
+  await admin.database().ref(`AwaitingPile/${makeDateTimeString(now)}`)
+  .once("value").then(snapshot => {
+    let requests = snapshot.val();
+    console.log(requests)
+    for(let [key, value] of Object.entries(requests)) {
+      updates[`/UserRequests/${value.userId}/${key}`] = null;
+      updates[`/Users/${value.userId}/awaitingMatchIDs/${key}`] = null;
+      updates[`/GobbleRequests/${todayString}/${value.dietaryRestriction}`] = null;
+    }
+  }).catch(err => console.log("15 minute awaitingmatchIDs clean up error " + err.message))
+  try {
+    updates[`/AwaitingPile/${todayTimeString}`] = null
+    await admin.database().ref().update(updates);
+    console.log(updates)
+    console.log("15 minute awaiting requests deletion complete")
+  } catch(err) {
+    console.log("15 minute awaiting requests deletion error " + err.message)
+  }
+})
+
+exports.schedulePendingCleanUpFunction = functions.pubsub.schedule('1-59/15 * * * *').onRun(async(context) => {
+  let updates = {}
+  let now = new Date();
+  now.setMinutes(findingNearestQuarterTime(now))
+  let dateTimeString = makeDateTimeString(now);
+  await admin.database().ref(`PendingMatchIDs/${dateTimeString}`)
+  .once("value").then(snapshot => {
+    let requests = snapshot.val();
+    for(let [key, value] of Object.entries(requests)) {
+      let ids = Object.keys(value)
+      for(let id of ids) {
+        updates[`/UserRequests/${id}/${key}`] = null;
+        updates[`/Users/${id}/pendingMatchIDs/${key}`] = null;
+      }
+    }
+  }).catch(err => console.log("15 minute awaitingmatchIDs clean up error " + err.message))
+  try {
+    updates[`PendingMatchIDs/${dateTimeString}`] = null;
+    console.log(updates)
+    await admin.database().ref().update(updates);
+    console.log("15 minute pending requests deletion complete")
+  } catch(err) {
+    console.log("15 minute pending requests deletion error " + err.message)
+  }
+})
 
 
 // exports.scheduleFunction = functions.pubsub.schedule('* * * * *').onRun((context) => {

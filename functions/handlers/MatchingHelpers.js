@@ -58,6 +58,10 @@ exports.makeDateString = (date) => {
     return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
+exports.makeDateTimeString = (date) => {
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}-${date.getMinutes()}`;
+}
+
   /**
    * Get coordinates of the user's location
    * @param {*} request match request sent by user searching for gobble
@@ -75,6 +79,10 @@ exports.getCoords = (request) => {
 exports.getDatetime = (request) => {
     console.log(request)
     return new Date(request['datetime'])
+}
+
+exports.getPendingTime = (request) => {
+  return new Date(request['pendingTime'])
 }
 
   /**
@@ -118,6 +126,11 @@ exports.isBlocked = async(uid, otherUid) => {
     return x;
 }
 
+exports.findingNearestQuarterTime = (date) => {
+  let minutes = date.getMinutes();
+  return Math.floor(minutes/15)*15
+}
+
 /**
    * Calculate distance between two users using coordinates provided
    * @param {*} coords1 coordinates of first user's location
@@ -149,8 +162,13 @@ exports.isWithinRange = (coords1, distance1, coords2, distance2) => {
    * @param {*} time2 Preferred time of second user request
    * @returns Boolean
    */
-exports.isWithinTime = (time1, time2) => {
-    return (Math.abs(time1-time2) <= 30)   
+exports.isWithinTime = (datetime1, datetime2) => {
+    const ACCEPTABLE_TIME_DIFF = 1800000
+    return Math.abs(datetime1 - datetime2) <= ACCEPTABLE_TIME_DIFF
+}
+
+exports.getDatetimeFromObject = (request) => {
+  return request['datetime']
 }
 
 /**

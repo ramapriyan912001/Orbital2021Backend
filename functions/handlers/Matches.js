@@ -9,6 +9,7 @@ const {
   getDistance,
   getThreshold,
   makeDateString,
+  makeDateTimeString,
   convertTimeToMinutes,
   gobbleRequestsRef,
   getUserDetails,
@@ -17,6 +18,8 @@ const {
   isWithinTime,
   DIETARY_ARRAYS,
   linkChats,
+  getPendingTime,
+  getDatetimeFromObject
 } = require('./MatchingHelpers')
 
 const {
@@ -46,13 +49,11 @@ exports.findGobbleMate = async(data, context) => {
     let tempRef;
     let coords1 = getCoords(request)
     let distance1 = getDistance(request)
-    let time1 = convertTimeToMinutes(date1)
     let bestMatch = null;
     let bestMatchCompatibility = 5;
     let dietaryRef;
     let counter = 0;
     let dietaryOptionsArray = DIETARY_ARRAYS[`${request.dietaryRestriction}`]
-    let requestRef2;
     let result = false;
     let response;
     // IF THE USER IS ANY, WE NEED TO SEARCH ALL THE PENDING REQUESTS
@@ -62,7 +63,7 @@ exports.findGobbleMate = async(data, context) => {
       tempRef = ref.child(`${dietaryOption}`);
       await tempRef.once("value").then(async(snapshot) => {//values in same day under dietaryOption
         let iterator, child;
-        let time2, coords2, distance2, date2;
+        let coords2, distance2, date2;
         let children = snapshot.val()
         let compatibility
         for(iterator in children) {//iterate through these values
@@ -70,7 +71,6 @@ exports.findGobbleMate = async(data, context) => {
           coords2 = getCoords(child)
           distance2 = getDistance(child)
           date2 = getDatetime(child)
-          time2 = convertTimeToMinutes(date2)
           //It's strange but isBlocked is not recognized if imported
           // from helpers
           // This is a hackish way of having it be recognised.
@@ -78,7 +78,7 @@ exports.findGobbleMate = async(data, context) => {
           let isBlocked2 = await isUserBlocked(child.userId, request.userId)
           let isBlocked = isBlocked1 || isBlocked2
           if(!isWithinRange(coords1, distance1, coords2, distance2) || 
-          !isWithinTime(time1, time2) || isBlocked ||
+          !isWithinTime(date1, date2) || isBlocked ||
           request.userId === child.userId) {
             console.log(child.userId)
             console.log(isWithinRange(coords1, distance1, coords2, distance2))
@@ -173,28 +173,38 @@ async function sendPushNotification(pushToken, message, body) {
     let request1UserDetails = await getUserDetails(request1.userId)
     const pendingMatchID = await gobbleRequestsRef().child('ANY').child('ANY').push().key;
     let updates = {};
+    let dateString = makeDateString(getDatetime(request2))
+    let dateTimeString = await makeDateTimeString(getDatetime(request2))
+    let pendingTime, pendingTimeString;
+    if(getDatetime(request1) < getDatetime(request2)) {
+      pendingTime = getDatetimeFromObject(request2)
+      pendingTimeString = makeDateTimeString(getDatetime(request2))
+    } else {
+      pendingTime = getDatetimeFromObject(request1)
+      pendingTimeString = makeDateTimeString(getDatetime(request1))
+    }
 
     //The Match Updates
     updates[`/Users/${request1.userId}/pendingMatchIDs/${pendingMatchID}`] = {...request1, otherUserId: request2.userId, 
-      otherUserCuisinePreference: request2.cuisinePreference, otherUserDietaryRestriction: request2UserDetails.diet, 
-      otherUserDOB: request2UserDetails.dob, otherUserLocation: request2.location, otherUserIndustry: request2UserDetails.industry,
+      otherUserCuisinePreference: request2.cuisinePreference, otherUserDietaryRestriction: request2UserDetails.diet, pendingTime: pendingTime,
+      otherUserDOB: request2UserDetails.dob, otherUserLocation: request2.location, otherUserIndustry: request2UserDetails.industry, otherUserDatetime: request2.datetime,
       otherUserAvatar: request2UserDetails.avatar, otherUserDistance: request2.distance, otherUserName: request2UserDetails.name, matchID: pendingMatchID, lastMessage:'',}
     updates[`/Users/${request2.userId}/pendingMatchIDs/${pendingMatchID}`] = {...request2, otherUserId: request1.userId,
-      otherUserCuisinePreference: request1.cuisinePreference, otherUserDietaryRestriction: request1UserDetails.diet, 
-      otherUserDOB: request1UserDetails.dob, otherUserLocation: request1.location, otherUserIndustry: request1UserDetails.industry, 
+      otherUserCuisinePreference: request1.cuisinePreference, otherUserDietaryRestriction: request1UserDetails.diet, pendingTime: pendingTime,
+      otherUserDOB: request1UserDetails.dob, otherUserLocation: request1.location, otherUserIndustry: request1UserDetails.industry, otherUserDatetime: request1.datetime,
       otherUserAvatar: request1UserDetails.avatar, otherUserDistance: request1.distance, otherUserName: request1UserDetails.name, matchID: pendingMatchID, lastMessage:'',}
 
     //Remove Respective Pending Matches
     // updates[`/Users/${request2.userId}/awaitingMatchIDs/${request1Ref}`] = null;
-    updates[`/Users/${request2.userId}/awaitingMatchIDs/${request2Ref}`] = null;
-    updates[`/UserRequests/${request2.userId}/${request2Ref}`] = null;
+    updates[`/Users/${request2.userId}/awaitingMatchIDs/${request2.matchID}`] = null;
+    updates[`/UserRequests/${request2.userId}/${request2.matchID}`] = null;
     updates[`/UserRequests/${request1.userId}/${pendingMatchID}`] = request1.datetime;
     updates[`/UserRequests/${request2.userId}/${pendingMatchID}`] = request2.datetime;
     // updates[`/GobbleRequests/${this.makeDateString(this.getDatetime(request1))}/${request1.dietaryRestriction}/${request1Ref}`] = null;
-    updates[`/GobbleRequests/${makeDateString(getDatetime(request2))}/${request2.dietaryRestriction}/${request2Ref}`] = null;
-
-    updates[`/PendingMatchIDs/${pendingMatchID}/${request1.userId}`] = false
-    updates[`/PendingMatchIDs/${pendingMatchID}/${request2.userId}`] = false;
+    updates[`/GobbleRequests/${dateString}/${request2.dietaryRestriction}/${request2Ref}`] = null;
+    updates[`/AwaitingPile/${dateTimeString}/${request2.matchID}`] = null;
+    updates[`/PendingMatchIDs/${pendingTimeString}/${pendingMatchID}/${request1.userId}`] = false
+    updates[`/PendingMatchIDs/${pendingTimeString}/${pendingMatchID}/${request2.userId}`] = false;
 
     try{
       // console.log('Updates',updates);
@@ -220,7 +230,10 @@ function makeGobbleRequest(ref, request, date) {
     const matchID = ref.child(`${request.dietaryRestriction}`).push().key;
     let updates = {};
     updates[`/Users/${request.userId}/awaitingMatchIDs/${matchID}`] = {...request, matchID: matchID};
-    updates[`/GobbleRequests/${makeDateString(date)}/${request.dietaryRestriction}/${matchID}`] = {...request, matchID: matchID};
+    let dateString = makeDateString(date)
+    let dateTimeString = makeDateTimeString(date)
+    updates[`/GobbleRequests/${dateString}/${request.dietaryRestriction}/${matchID}`] = {...request, matchID: matchID};
+    updates[`/AwaitingPile/${dateTimeString}/${matchID}`] = {...request, matchID: matchID};
     updates[`/UserRequests/${request.userId}/${matchID}`] = request.datetime;
     // Add more updates here
     admin.database().ref().update(updates);
@@ -252,7 +265,7 @@ exports.matchDecline = async(data, context) => {
       updates[`/Users/${request.otherUserId}/pendingMatchIDs/${request.matchID}`] = null
       updates[`/UserRequests/${request.userId}/${request.matchID}`] = null;
       updates[`/UserRequests/${request.otherUserId}/${request.matchID}`] = null;
-      updates[`/PendingMatchIDs/${request.matchID}`] = null;
+      updates[`/PendingMatchIDs/${makeDateTimeString(getPendingTime(request))}/${request.matchID}`] = null;
       try {
         await admin.database().ref().update(updates);
         let pushToken = await getPushToken(request.otherUserId);
@@ -273,7 +286,7 @@ exports.matchDecline = async(data, context) => {
 
 exports.matchConfirm = async (data, context) => {
   let request = data.request;
-  let result = await admin.database().ref(`/PendingMatchIDs/${request.matchID}/${request.otherUserId}`)
+  let result = await admin.database().ref(`/PendingMatchIDs/${makeDateTimeString(getPendingTime(request))}/${request.matchID}/${request.otherUserId}`)
   .once("value")
   .then(snapshot => snapshot.val())
   .catch(err => {
@@ -286,7 +299,7 @@ exports.matchConfirm = async (data, context) => {
     return matchFinalise(request);
   } else {
     let updates = {}
-    updates[`/PendingMatchIDs/${request.matchID}/${request.userId}`] = true;
+    updates[`/PendingMatchIDs/${makeDateTimeString(getPendingTime(request))}/${request.matchID}/${request.userId}`] = true;
     try{
       // console.log('Updates',updates);
       await admin.database().ref().update(updates);
@@ -320,7 +333,7 @@ async function matchFinalise(request) {
   updates[`/Users/${request.userId}/matchIDs/${request.matchID}`] = request
   updates[`/Users/${request.otherUserId}/matchIDs/${request.matchID}`] = otherUserRequest
 
-  updates[`/PendingMatchIDs/${request.matchID}`] = null
+  updates[`/PendingMatchIDs/${makeDateTimeString(getPendingTime(request))}/${request.matchID}`] = null
   updates[`/Users/${request.userId}/pendingMatchIDs/${request.matchID}`] = null
   updates[`/Users/${request.otherUserId}/pendingMatchIDs/${request.matchID}`] = null
 
@@ -347,7 +360,7 @@ async function matchFinalise(request) {
 exports.matchUnaccept = async(data, context) => {
   let request = data.request;
   let updates = {}
-  updates[`/PendingMatchIDs/${request.matchID}/${request.userId}`] = false;
+  updates[`/PendingMatchIDs/${makeDateTimeString(getPendingTime(request))}/${request.matchID}/${request.userId}`] = false;
   try{
     await admin.database().ref().update(updates);
     return {
