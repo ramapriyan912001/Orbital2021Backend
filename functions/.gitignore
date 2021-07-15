@@ -1,7 +1,3 @@
-
-.env
-
 node_modules/
-keys/
 functions/utils/admin.js
 functions/utils/config.js
