@@ -44,7 +44,6 @@ exports.matchConfirm = functions.https.onCall(matchConfirm)
 exports.findGobbleMate = functions.https.onCall(findGobbleMate)
 exports.matchUnaccept = functions.https.onCall(matchUnaccept)
 // exports.scheduledMatchingFunctions = functions.pubsub.schedule('*/10 * * * *').onRun((context) => {
-
 // })
 
 
