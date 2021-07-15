@@ -15,7 +15,7 @@ exports.DIETARY_ARRAYS = {//was Bug
 }
 
 
-exports.getUserCollection = (id, success, failure) => id != null
+const getUserCollection = (id, success, failure) => id != null
                                                 ? userRef(id)
                                                   .once('value')
                                                   .then(success)
@@ -44,7 +44,7 @@ exports.gobbleRequestsRef = () => {
    * @param {*} params id of object
    * @returns reference
    */
-exports.userRef = (params) => {
+const userRef = (params) => {
     return admin.database().ref(`Users/${params}`);
 }
 
@@ -124,7 +124,7 @@ exports.isBlocked = async(uid, otherUid) => {
    * @param {*} coords2 coordinates of second user's location
    * @returns the distance between the two users via a number value
    */
-exports.calculateDistance = async(coords1, coords2) => {
+const calculateDistance = (coords1, coords2) => {
     let lat1 = coords1['latitude']
     let lat2 = coords2['latitude']
     let lon1 = coords1['longitude']

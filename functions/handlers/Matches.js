@@ -1,4 +1,8 @@
-
+const firebase = require("firebase");
+const {admin} = require("../utils/admin");
+const functions = require('firebase-functions')
+const { config } = require("../utils/config");
+const fetcher = require('node-fetch')
 const {
   getCoords,
   getDatetime,
@@ -8,16 +12,30 @@ const {
   convertTimeToMinutes,
   gobbleRequestsRef,
   getUserDetails,
-  getUserCollection,
   measureCompatibility,
   isWithinRange,
   isWithinTime,
-  obtainStatusOfPendingMatch,
-  userRef,
-  calculateDistance,
   DIETARY_ARRAYS,
   linkChats,
 } = require('./MatchingHelpers')
+
+const {
+  CONFIRM_SUCCESS, CONFIRM_FAIL, FINAL_SUCCESS, 
+  FINAL_FAIL, UNACCEPT_SUCCESS, UNACCEPT_FAIL, BLOCK_SUCCESS, 
+  BLOCK_FAILURE, UNBLOCK_SUCCESS, UNBLOCK_FAILURE, DECLINE_SUCCESS, DECLINE_FAIL
+} = require('./Results')
+
+const isUserBlocked = async(uid, otherUid) => {
+  let x = false;
+  x = await admin.database().ref(`Users/${uid}/blockedUsers/${otherUid}`)
+  .once("value")
+  .then(snapshot => {
+    return snapshot.val() ? true : false}
+    )
+  .catch(err => console.log(err)
+  )
+  return x;
+}
 
 exports.findGobbleMate = async(data, context) => {
     let request = data.request;
@@ -56,23 +74,15 @@ exports.findGobbleMate = async(data, context) => {
           //It's strange but isBlocked is not recognized if imported
           // from helpers
           // This is a hackish way of having it be recognised.
-          const isUserBlocked = async(uid, otherUid) => {
-            let x = false;
-            x = await admin.database().ref(`Users/${uid}/blockedUsers/${otherUid}`)
-            .once("value")
-            .then(snapshot => {
-              return snapshot.val() ? true : false}
-              )
-            .catch(err => console.log(err)
-            )
-            return x;
-          }
           let isBlocked1 = await isUserBlocked(request.userId, child.userId)
           let isBlocked2 = await isUserBlocked(child.userId, request.userId)
           let isBlocked = isBlocked1 || isBlocked2
           if(!isWithinRange(coords1, distance1, coords2, distance2) || 
           !isWithinTime(time1, time2) || isBlocked ||
           request.userId === child.userId) {
+            console.log(child.userId)
+            console.log(isWithinRange(coords1, distance1, coords2, distance2))
+            console.log(coords1, distance1, coords2, distance2)
             console.log('out of range/time/same user/blocked');
             continue;
           }
@@ -93,18 +103,27 @@ exports.findGobbleMate = async(data, context) => {
         }
       })
       if(result) {
-        return response;
+        return {
+          found: true,
+          success: true, 
+        };
       }
     }
     if (counter === dietaryOptionsArray.length) {
         if (bestMatch != null) {
           console.log("AT THE END OF LOOP");
-          response = await match(request, null, bestMatch, dietaryRef);
-          return response;
+          await match(request, null, bestMatch, dietaryRef);
+          return {
+            found: true,
+            success: true, 
+          };
         } else {
-              makeGobbleRequest(ref, request, date1)
+          await makeGobbleRequest(ref, request, date1)
           // Match not found, user may receive push notification later (or else scheduling push notifications)
-          return response;
+          return {
+            found: false,
+            success: true,
+          }
         }
     }
 }
@@ -168,7 +187,6 @@ async function sendPushNotification(pushToken, message, body) {
     //Remove Respective Pending Matches
     // updates[`/Users/${request2.userId}/awaitingMatchIDs/${request1Ref}`] = null;
     updates[`/Users/${request2.userId}/awaitingMatchIDs/${request2Ref}`] = null;
-    console.log(request2Ref)
     updates[`/UserRequests/${request2.userId}/${request2Ref}`] = null;
     updates[`/UserRequests/${request1.userId}/${pendingMatchID}`] = request1.datetime;
     updates[`/UserRequests/${request2.userId}/${pendingMatchID}`] = request2.datetime;
@@ -183,11 +201,12 @@ async function sendPushNotification(pushToken, message, body) {
       await admin.database().ref().update(updates);
     } catch(err) {
       console.log('Match Update Error:', err.message);
+      return false;
     }
-
       //After performing all updates, send push notif to other user about match
     let pushToken = await getPushToken(request2.userId);
-    return sendPushNotification(pushToken, 'We found you a Match!', 'You can view it in the Matches tab');
+    sendPushNotification(pushToken, 'We found you a Match!', 'You can view it in the Matches tab');
+    return true;
 }
 
 /**
@@ -208,7 +227,7 @@ function makeGobbleRequest(ref, request, date) {
 }
 
 async function getPushToken(uid) {
-  return await admin.database().ref(`PushTokens/${uid}`).once("value")
+  return admin.database().ref(`PushTokens/${uid}`).once("value")
           .then(snapshot => {
               return snapshot.val();
           })
@@ -234,20 +253,34 @@ exports.matchDecline = async(data, context) => {
       updates[`/UserRequests/${request.userId}/${request.matchID}`] = null;
       updates[`/UserRequests/${request.otherUserId}/${request.matchID}`] = null;
       updates[`/PendingMatchIDs/${request.matchID}`] = null;
-      await admin.database().ref().update(updates);
-      let pushToken = await getPushToken(request.otherUserId);
-      return await sendPushNotification(pushToken, "Oh No! Your match has been declined", "Please schedule another match!");
+      try {
+        await admin.database().ref().update(updates);
+        let pushToken = await getPushToken(request.otherUserId);
+        sendPushNotification(pushToken, "Oh No! Your match has been declined", "Please schedule another match!");
+        return {
+          success: true,
+          message: DECLINE_SUCCESS
+        }
+      } catch(err) {
+        console.log('Match Decline Error ' + err.message)
+        return {
+          success: false,
+          message: DECLINE_FAIL
+        }
+      }
 }
 
 
 exports.matchConfirm = async (data, context) => {
   let request = data.request;
-  let result = await firebase.database().ref(`/PendingMatchIDs/${request.matchID}/${request.otherUserId}`)
+  let result = await admin.database().ref(`/PendingMatchIDs/${request.matchID}/${request.otherUserId}`)
   .once("value")
   .then(snapshot => snapshot.val())
   .catch(err => {
     console.log(err.message);
-    return {};
+    return {
+      success: false,
+      message: CONFIRM_FAIL};
   });
   if(result) {
     return matchFinalise(request);
@@ -259,27 +292,29 @@ exports.matchConfirm = async (data, context) => {
       await admin.database().ref().update(updates);
       return {
           success: true,
-          message: 'CONFIRM_SUCCESS'
+          message: CONFIRM_SUCCESS
       }
     } catch(err) {
       console.log('Match Confirm Error:', err.message);
       return {
           success: false,
-          message: 'CONFIRM_FAILURE'
+          message: CONFIRM_FAIL
       }
     }
   }
 }
 
-async function matchFinalise(data, context) {
-  let request = data.request;
+async function matchFinalise(request) {
   let updates = {};
-  let otherUserRequest = await firebase.database().ref(`/Users/${request.otherUserId}/pendingMatchIDs/${request.matchID}`)
+  let otherUserRequest = await admin.database().ref(`/Users/${request.otherUserId}/pendingMatchIDs/${request.matchID}`)
   .once("value")
   .then(snapshot => snapshot.val())
   .catch(err => {
     console.log(err.message);
-    return {};
+    return {
+      success: false,
+      message: FINAL_FAIL
+    }
   });
 
   updates[`/Users/${request.userId}/matchIDs/${request.matchID}`] = request
@@ -292,27 +327,38 @@ async function matchFinalise(data, context) {
   updates = await linkChats(updates, request, otherUserRequest);
   try{
     // console.log('Updates',updates);
-    await firebase.database().ref().update(updates);
+    await admin.database().ref().update(updates);
     //Sending Push Notifications to other user
     let pushToken = await getPushToken(request.otherUserId);
-    return await sendPushNotification(pushToken, 'Match Confirmed!', 'You can now text your new Match!');
+    sendPushNotification(pushToken, 'Match Confirmed!', 'You can now text your new Match!');
+    return {
+      success: true,
+      message: FINAL_SUCCESS
+    }
   } catch(err) {
     console.log('Match Confirm Error:', err.message);
     return ({
       success: false,
-      message: `ADMIN MATCHCONFIRM ERROR: ${err.message}`
+      message: FINAL_FAIL
     });
   }
 }
 
-exports.matchUnaccept = async(request) => {
+exports.matchUnaccept = async(data, context) => {
+  let request = data.request;
   let updates = {}
   updates[`/PendingMatchIDs/${request.matchID}/${request.userId}`] = false;
   try{
     await admin.database().ref().update(updates);
-    return UNACCEPT_SUCCESS
+    return {
+      success: true,
+      message: UNACCEPT_SUCCESS
+    }
   } catch(err) {
     console.log('Match Confirm Error:', err.message);
-    return UNACCEPT_FAIL
+    return {
+      success: false,
+      message: UNACCEPT_FAIL
+    }
   }
 }
