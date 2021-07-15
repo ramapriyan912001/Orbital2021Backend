@@ -19,7 +19,9 @@ const {
   DIETARY_ARRAYS,
   linkChats,
   getPendingTime,
-  getDatetimeFromObject
+  getDatetimeFromObject,
+  sendPushNotification,
+  getPushToken
 } = require('./MatchingHelpers')
 
 const {
@@ -128,39 +130,6 @@ exports.findGobbleMate = async(data, context) => {
     }
 }
 
-async function sendPushNotification(pushToken, message, body) {
-  try {
-    if (pushToken == null) {
-      return ({
-        success: false,
-        message: `ADMIN PUSHTOKEN ERROR: pushToken does not exist`
-      });
-    } else {
-      let response = await fetcher('https://exp.host/--/api/v2/push/send', {
-              body: JSON.stringify({
-                to: pushToken,
-                title: message,
-                body: body,
-              }),
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              method: 'POST',
-          });
-          return {
-              success: true,
-              message: response
-          };
-    }
-  } catch (err) {
-    console.log(err.message);
-    return ({
-      success: false,
-      message: `ADMIN PUSH NOTIF ERROR: ${err.message}`
-    });
-  }
-}
-
 /**
    * Handling database operations when two users match
    * @param {*} request1 request sent by first user
@@ -238,18 +207,6 @@ function makeGobbleRequest(ref, request, date) {
     // Add more updates here
     admin.database().ref().update(updates);
 }
-
-async function getPushToken(uid) {
-  return admin.database().ref(`PushTokens/${uid}`).once("value")
-          .then(snapshot => {
-              return snapshot.val();
-          })
-          .catch(err => {
-            console.log(err.message);
-            return {};
-          });
-}
-
 
 exports.matchDecline = async(data, context) => {
   let request = data.request;

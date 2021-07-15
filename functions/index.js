@@ -27,6 +27,10 @@ const {
   matchUnaccept,
 } = require('./handlers/Matches')
 
+const {
+  sendMessageNotif
+} = require('./handlers/Chats');
+
 // // Create and Deploy Your First Cloud Functions
 // // https://firebase.google.com/docs/functions/write-firebase-functions
 // //
@@ -49,6 +53,7 @@ exports.matchDecline = functions.https.onCall(matchDecline)
 exports.matchConfirm = functions.https.onCall(matchConfirm)
 exports.findGobbleMate = functions.https.onCall(findGobbleMate)
 exports.matchUnaccept = functions.https.onCall(matchUnaccept)
+exports.sendMessageNotif = functions.https.onCall(sendMessageNotif);
 // exports.scheduledMatchingFunctions = functions.pubsub.schedule('*/10 * * * *').onRun((context) => {
 // })
 exports.scheduleAwaitingCleanUpFunction = functions.pubsub.schedule('1-59/15 * * * *').onRun(async(context) => {

@@ -235,20 +235,46 @@ exports.linkChats = async(updates, req1, req2) => {
           // .catch(err => console.log('Linking Chats Error:', err.message));
 }
 
-/**
-   * Get the reference to object within the chats object within the database
-   * @param {*} params id of object
-   * @returns reference
-   */
-function chatsRef(params) {
-    return admin.database().ref(`Chats/${params}`);
-}
+exports.getPushToken = async (uid) => {
+  return admin.database().ref(`PushTokens/${uid}`).once("value")
+          .then(snapshot => {
+              return snapshot.val();
+          })
+          .catch(err => {
+            console.log(err.message);
+            return {};
+          });
+};
 
-/**
-   * Get the reference to chat object within the conversation object within the database
-   * @param {*} params id of object
-   * @returns reference
-   */
-function conversationRef(params) {
-    return admin.database().ref(`Conversation/${params}`);
+exports.sendPushNotification = async (pushToken, message, body) => {
+  try {
+    if (pushToken == null) {
+      return ({
+        success: false,
+        message: `ADMIN PUSHTOKEN ERROR: pushToken does not exist`
+      });
+    } else {
+      let response = await fetcher('https://exp.host/--/api/v2/push/send', {
+              body: JSON.stringify({
+                to: pushToken,
+                title: message,
+                body: body,
+              }),
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              method: 'POST',
+          });
+          return {
+              success: true,
+              message: response
+          };
+    }
+  } catch (err) {
+    console.log(err.message);
+    return ({
+      success: false,
+      message: `ADMIN PUSH NOTIF ERROR: ${err.message}`
+    });
+  }
 }
