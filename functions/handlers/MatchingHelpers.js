@@ -278,3 +278,32 @@ exports.sendPushNotification = async (pushToken, message, body) => {
     });
   }
 }
+
+exports.sendPushNotifications = (messages) => {
+  try {
+    if (messages == []) {
+      return ({
+        success: true,
+        message: `NO MESSAGES TO SEND`
+      });
+    } else {
+      let response = await fetcher('https://exp.host/--/api/v2/push/send', {
+              body: JSON.stringify(messages),
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              method: 'POST',
+          });
+          return {
+              success: true,
+              message: response
+          };
+    }
+  } catch (err) {
+    console.log(err.message);
+    return ({
+      success: false,
+      message: `PUSH NOTIF FAILED: ${err.message}`
+    });
+  }
+}

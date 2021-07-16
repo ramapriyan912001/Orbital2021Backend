@@ -8,7 +8,9 @@ const App = express();
 const {
   makeDateString,
   findingNearestQuarterTime,
-  makeDateTimeString
+  makeDateTimeString,
+  getPushToken,
+  sendPushNotifications
 } = require('./handlers/MatchingHelpers')
 
 const {
@@ -54,28 +56,37 @@ exports.matchConfirm = functions.https.onCall(matchConfirm)
 exports.findGobbleMate = functions.https.onCall(findGobbleMate)
 exports.matchUnaccept = functions.https.onCall(matchUnaccept)
 exports.sendMessageNotif = functions.https.onCall(sendMessageNotif);
-// exports.scheduledMatchingFunctions = functions.pubsub.schedule('*/10 * * * *').onRun((context) => {
-// })
+
 exports.scheduleAwaitingCleanUpFunction = functions.pubsub.schedule('1-59/15 * * * *').onRun(async(context) => {
   let updates = {}
   let now = new Date();
   now.setMinutes(findingNearestQuarterTime(now))
   let todayString = makeDateString(now);
   let todayTimeString = makeDateTimeString(now)
+  let messages = []
   await admin.database().ref(`AwaitingPile/${makeDateTimeString(now)}`)
   .once("value").then(snapshot => {
     let requests = snapshot.val();
-    console.log(requests)
     for(let [key, value] of Object.entries(requests)) {
       updates[`/UserRequests/${value.userId}/${key}`] = null;
       updates[`/Users/${value.userId}/awaitingMatchIDs/${key}`] = null;
       updates[`/GobbleRequests/${todayString}/${value.dietaryRestriction}`] = null;
+      const userPushToken = getPushToken(value.userId)
+      if(userPushToken != null) {
+        messages.push({
+          to: userPushToken,
+          title: 'Time elapsed on your Gobble request!',
+          body: 'Make another request and find a Gobblemate!'
+        })
+      }
     }
   }).catch(err => console.log("15 minute awaitingmatchIDs clean up error " + err.message))
+  if(messages != []) {
+    sendPushNotifications(messages);
+  }
   try {
     updates[`/AwaitingPile/${todayTimeString}`] = null
     await admin.database().ref().update(updates);
-    console.log(updates)
     console.log("15 minute awaiting requests deletion complete")
   } catch(err) {
     console.log("15 minute awaiting requests deletion error " + err.message)
@@ -85,6 +96,7 @@ exports.scheduleAwaitingCleanUpFunction = functions.pubsub.schedule('1-59/15 * *
 exports.schedulePendingCleanUpFunction = functions.pubsub.schedule('1-59/15 * * * *').onRun(async(context) => {
   let updates = {}
   let now = new Date();
+  messsages = []
   now.setMinutes(findingNearestQuarterTime(now))
   let dateTimeString = makeDateTimeString(now);
   await admin.database().ref(`PendingMatchIDs/${dateTimeString}`)
@@ -95,9 +107,20 @@ exports.schedulePendingCleanUpFunction = functions.pubsub.schedule('1-59/15 * * 
       for(let id of ids) {
         updates[`/UserRequests/${id}/${key}`] = null;
         updates[`/Users/${id}/pendingMatchIDs/${key}`] = null;
+        let userPushToken = getPushToken(id)
+        if(userPushToken != null) {
+          messages.push({
+            to: userPushToken,
+            title: 'Time elapsed on your Pending Match!',
+            body: 'Make another request and find a Gobblemate!'
+          })
+        }
       }
     }
   }).catch(err => console.log("15 minute awaitingmatchIDs clean up error " + err.message))
+  if(messages != []) {
+    sendPushNotifications(messages);
+  }
   try {
     updates[`PendingMatchIDs/${dateTimeString}`] = null;
     console.log(updates)
@@ -107,12 +130,3 @@ exports.schedulePendingCleanUpFunction = functions.pubsub.schedule('1-59/15 * * 
     console.log("15 minute pending requests deletion error " + err.message)
   }
 })
-
-
-// exports.scheduleFunction = functions.pubsub.schedule('* * * * *').onRun((context) => {
-//   let updates = {};
-//   updates['/time'] = Math.random();
-//   admin.database().ref().update(updates);
-//   console.log('This will be run every minute!');
-//   return null;
-// });
