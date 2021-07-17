@@ -10,7 +10,6 @@ const {
   getThreshold,
   makeDateString,
   makeDateTimeString,
-  convertTimeToMinutes,
   gobbleRequestsRef,
   getUserDetails,
   measureCompatibility,
@@ -26,8 +25,8 @@ const {
 
 const {
   CONFIRM_SUCCESS, CONFIRM_FAIL, FINAL_SUCCESS, 
-  FINAL_FAIL, UNACCEPT_SUCCESS, UNACCEPT_FAIL, BLOCK_SUCCESS, 
-  BLOCK_FAILURE, UNBLOCK_SUCCESS, UNBLOCK_FAILURE, DECLINE_SUCCESS, DECLINE_FAIL
+  FINAL_FAIL, UNACCEPT_SUCCESS, UNACCEPT_FAIL, DECLINE_SUCCESS, 
+  DECLINE_FAIL, DELETE_REQUEST_SUCCESS, DELETE_REQUEST_FAILURE
 } = require('./Results')
 
 const isUserBlocked = async(uid, otherUid) => {
@@ -44,6 +43,19 @@ const isUserBlocked = async(uid, otherUid) => {
 
 exports.findGobbleMate = async(data, context) => {
     let request = data.request;
+    let uid = await admin
+    .auth()
+    .verifyIdToken(data.idToken)
+    .then(decodedToken => {
+        return decodedToken.uid;
+    })
+    if(uid == null || uid != request.userId) {
+      console.log("Unauthorized request findGobbleMate")
+      return {
+        found: false,
+        success: false,
+      }
+    }
     let date1 = getDatetime(request)
     let ref = gobbleRequestsRef()
     .child(makeDateString(date1))
@@ -169,7 +181,6 @@ exports.findGobbleMate = async(data, context) => {
     updates[`/UserRequests/${request2.userId}/${request2.matchID}`] = null;
     updates[`/UserRequests/${request1.userId}/${pendingMatchID}`] = request1.datetime;
     updates[`/UserRequests/${request2.userId}/${pendingMatchID}`] = request2.datetime;
-    // updates[`/GobbleRequests/${this.makeDateString(this.getDatetime(request1))}/${request1.dietaryRestriction}/${request1Ref}`] = null;
     updates[`/GobbleRequests/${dateString}/${request2.dietaryRestriction}/${request2Ref}`] = null;
     updates[`/AwaitingPile/${dateTimeString}/${request2.matchID}`] = null;
     updates[`/PendingMatchIDs/${pendingTimeString}/${pendingMatchID}/${request1.userId}`] = false
@@ -210,12 +221,19 @@ function makeGobbleRequest(ref, request, date) {
 
 exports.matchDecline = async(data, context) => {
   let request = data.request;
-  let uid = admin
+  let uid = await admin
   .auth()
   .verifyIdToken(data.idToken)
   .then(decodedToken => {
       return decodedToken.uid;
   })
+  if(uid == null || uid != request.userId) {
+    console.log("Unauthorized request matchDecline")
+    return {
+      success: false,
+      message: DECLINE_FAIL
+    }
+  }
       // add a check?
       let updates = {}
       updates[`/Users/${request.userId}/pendingMatchIDs/${request.matchID}`] = null
@@ -243,6 +261,19 @@ exports.matchDecline = async(data, context) => {
 
 exports.matchConfirm = async (data, context) => {
   let request = data.request;
+  let uid = await admin
+  .auth()
+  .verifyIdToken(data.idToken)
+  .then(decodedToken => {
+      return decodedToken.uid;
+  })
+  if(uid == null || uid != request.userId) {
+    console.log("Unauthorized request matchConfirm")
+    return {
+      success: false,
+      message: CONFIRM_FAIL
+    }
+  }
   let result = await admin.database().ref(`/PendingMatchIDs/${makeDateTimeString(getPendingTime(request))}/${request.matchID}/${request.otherUserId}`)
   .once("value")
   .then(snapshot => snapshot.val())
@@ -316,6 +347,19 @@ async function matchFinalise(request) {
 
 exports.matchUnaccept = async(data, context) => {
   let request = data.request;
+  let uid = await admin
+  .auth()
+  .verifyIdToken(data.idToken)
+  .then(decodedToken => {
+      return decodedToken.uid;
+  })
+  if(uid == null || uid != request.userId) {
+    console.log("Unauthorized Request matchUnaccept")
+    return {
+      success: false,
+      message: UNACCEPT_FAIL
+    }
+  }
   let updates = {}
   updates[`/PendingMatchIDs/${makeDateTimeString(getPendingTime(request))}/${request.matchID}/${request.userId}`] = false;
   try{
@@ -329,6 +373,44 @@ exports.matchUnaccept = async(data, context) => {
     return {
       success: false,
       message: UNACCEPT_FAIL
+    }
+  }
+}
+
+exports.deleteAwaitingRequest = async(data, context) => {
+  let request = data.request
+  let uid = await admin
+    .auth()
+    .verifyIdToken(data.idToken)
+    .then(decodedToken => {
+        return decodedToken.uid;
+    })
+    if(uid == null || uid != request.userId) {
+      console.log("Unauthorized request deleteAwaitingRequest")
+      return {
+        success: false,
+        message: DELETE_REQUEST_FAILURE,
+      }
+    }
+  let updates = {};
+  updates[`/Users/${request.userId}/awaitingMatchIDs/${request.matchID}`] = null;
+  let dateString = makeDateString(getDatetime(request))
+  let dateTimeString = await makeDateTimeString(new Date(getDatetime(request).toUTCString().slice(0, -4)))
+  updates[`/GobbleRequests/${dateString}/${request.dietaryRestriction}/${request.matchID}`] = null;
+  updates[`/AwaitingPile/${dateTimeString}/${request.matchID}`] = null;
+  updates[`/UserRequests/${request.userId}/${request.matchID}`] = null
+  // Add more updates here
+  try {
+    await admin.database().ref().update(updates);
+    return {
+      success: true,
+      message: DELETE_REQUEST_SUCCESS
+    }
+  } catch(err) {
+    console.log('Delete Awaiting Request Error: ' + err)
+    return {
+      success: false,
+      message: DELETE_REQUEST_FAILURE
     }
   }
 }

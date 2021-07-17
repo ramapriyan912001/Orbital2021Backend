@@ -20,33 +20,29 @@ const {
   updateFullAuthUser,
   promoteToAdmin,
   addPushTokenToDatabase,
+  deleteAccount,
 } = require('./handlers/Users');
+
+const {
+  blockUser,
+  unblockUser,
+  makeReport,
+  deleteReport
+} = require('./handlers/ReportBlock')
 
 const {
   matchDecline,
   matchConfirm,
   findGobbleMate,
   matchUnaccept,
+  deleteAwaitingRequest,
 } = require('./handlers/Matches')
 
 const {
   sendMessageNotif
 } = require('./handlers/Chats');
 
-// // Create and Deploy Your First Cloud Functions
-// // https://firebase.google.com/docs/functions/write-firebase-functions
-// //
-// exports.helloWorld = functions.https.onRequest((request, response) => {
-//   functions.logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
-
-// App.post('/createAuth', createAuthUser);
-// App.put('/updateAuth/:uid', updateFullAuthUser);
-// App.post('/deleteUser/:uid', deleteUserByUID);
-// App.post('/deleteUsers', deleteUsersByUID);//Pass List of UIDs in req.body.body
-
-// exports.api = functions.region('us-central1').https.onRequest(App);
+// API calls from frontend
 exports.deleteUser = functions.https.onCall(deleteUserByUID);
 exports.deleteUsers = functions.https.onCall(deleteUsersByUID);
 exports.promoteUserToAdmin = functions.https.onCall(promoteToAdmin);
@@ -56,7 +52,16 @@ exports.matchConfirm = functions.https.onCall(matchConfirm)
 exports.findGobbleMate = functions.https.onCall(findGobbleMate)
 exports.matchUnaccept = functions.https.onCall(matchUnaccept)
 exports.sendMessageNotif = functions.https.onCall(sendMessageNotif);
+exports.deleteAccount = functions.https.onCall(deleteAccount)
+exports.blockUser = functions.https.onCall(blockUser)
+exports.unblockUser = functions.https.onCall(unblockUser)
+exports.makeReport = functions.https.onCall(makeReport)
+exports.deleteReport = functions.https.onCall(deleteReport)
+exports.deleteAwaitingRequest = functions.https.onCall(deleteAwaitingRequest)
 
+
+
+//Scheduled Functions
 exports.scheduleAwaitingCleanUpFunction = functions.pubsub.schedule('1-59/15 * * * *').onRun(async(context) => {
   let updates = {}
   let now = new Date();

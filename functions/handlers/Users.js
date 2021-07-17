@@ -12,10 +12,10 @@ firebase.initializeApp(config);
 // let expo = new Expo({accessToken: process.env.EXPO_ACCESS_TOKEN})
 
 const userExists = (uid) => admin.auth().getUser(uid).then(user => true).catch(err => false);
-const isAdmin = () => {
-    return firebase
+const isAdmin = (uid) => {
+    return admin
     .database()
-    .ref(`ReportCount/${this.uid}`)
+    .ref(`ReportCount/${uid}`)
     .once("value")
     .then(snapshot => snapshot.exists())
   };
@@ -88,7 +88,8 @@ const deleteUserCollection = (uid) => {
         updates[`/ComplaintHistory/${uid}`] = null;
         updates[`/ComplaintCount/${uid}`] = null;
         updates[`/Chats/${uid}`] = null;
-        if(isAdmin()) {
+        updates[`PushTokens/${uid}`] = null;
+        if(isAdmin(uid)) {
             updates[`/ReportCount/${uid}`] = null
         }
           // Need to delete any awaiting requests he has or
@@ -337,6 +338,84 @@ exports.promoteToAdmin = (data, context) => {
         success: false,
         message: `PROMOTE ADMIN - GET USER ERROR: ${err.message}`
     }));
+};
+
+exports.deleteAccount = (data, context) => {
+    // Verify the ID token while checking if the token is revoked by passing
+    // checkRevoked true.
+    let uid = data.uid;
+    const idToken = data.idToken;
+    console.log('Token: ', idToken);
+    return admin
+    .auth()
+    .verifyIdToken(idToken)
+    .then((decodedToken) => {
+        if (decodedToken.uid === null || decodedToken.uid != uid) {
+            return ({
+                success: false,
+                message: `Calling User does not have Permissions`
+            });
+        } else {
+            return admin
+            .auth()
+            .deleteUser(uid)
+            .then(() => {
+            if (deleteUserCollection(uid)) {
+                console.log('Successfully deleted user');
+                return ({
+                    success: true,
+                    message: `User ${uid} has been deleted!`
+                });
+            } else {
+                console.log('Error deleting User Collection');
+                return ({
+                    success: false,
+                    message: `DELETE USER ERROR: Auth deleted but User Collection not deleted fully`
+                });
+            }
+            })
+            .catch((error) => {
+            if ('auth/user-not-found' === error.message) {
+                if (deleteUserCollection(uid)) {
+                    console.log('ADMIN: Successfully deleted user from collection ONLY');
+                    return ({
+                        success: true,
+                        message: `User ${uid} has been deleted!`
+                    });
+                } else {
+                    console.log('ADMIN: Error deleting User Collection');
+                    return ({
+                        success: false,
+                        message: `ADMIN DELETE USER ERROR: Auth deleted but User Collection not deleted fully`
+                    });
+                }
+            } else {
+                console.log('ADMIN: Error deleting user:', error.message);
+                return ({
+                    success: false,
+                    message: `ADMIN DELETE USER ERROR: ${error.message}`
+                });
+            }
+            });
+        }
+    })
+    .catch((error) => {
+        if (error.code == 'auth/id-token-revoked') {
+        // Token has been revoked. Inform the user to reauthenticate or signOut() the user.
+            console.log('ADMIN DELETE USER MESSAGE: TOKEN REVOKED');
+            return ({
+                success: false,
+                message: `Token Revoked, Sign Out or Re-Authenticate`
+            })
+        } else {
+            console.log(`ADMIN DELETE USER ERROR: ${error.message}`);
+            return ({
+                success: false,
+                message: error.message
+            })
+        // Token is invalid.
+        }
+    });
 };
 
 // module.exports({ deleteUserByUID, deleteUsersByUID, createAuthUser, updateFullAuthUser });

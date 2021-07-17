@@ -186,6 +186,14 @@ exports.getThreshold = (request) => {
     return 18;
 }
 
+function chatsRef(params) {
+  return admin.database().ref(`Chats/${params}`);
+}
+
+function conversationRef(params) {
+  return admin.database().ref(`Conversation/${params}`);
+}
+
 /**
    * Asynchronously create a chat for matched users
    */
@@ -279,7 +287,7 @@ exports.sendPushNotification = async (pushToken, message, body) => {
   }
 }
 
-exports.sendPushNotifications = (messages) => {
+exports.sendPushNotifications = async(messages) => {
   try {
     if (messages == []) {
       return ({
