@@ -43,7 +43,6 @@ const isUserBlocked = async(uid, otherUid) => {
 
 exports.findGobbleMate = async(data, context) => {
     let request = data.request;
-    let applyThreshold = false;
     let uid = await admin
     .auth()
     .verifyIdToken(data.idToken)

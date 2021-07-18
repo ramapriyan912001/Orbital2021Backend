@@ -14,6 +14,14 @@ exports.DIETARY_ARRAYS = {//was Bug
   "Any": ["Any", "Vegetarian", "Halal"],
 }
 
+const DIET_SCORE_CALCULATION = {
+  "Strictly Vegetarian": {},
+  "Vegetarian": {},
+  "Halal": {},
+  "Strictly Halal": {},
+  "Any": {}
+}
+
 
 const getUserCollection = (id, success, failure) => id != null
                                                 ? userRef(id)
@@ -56,6 +64,13 @@ const userRef = (params) => {
    */
 exports.makeDateString = (date) => {
     return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+exports.isGobbleTimeClose = (date) => {
+  let now = new Date()
+  date = new Date(date);
+  const TIME_TOO_CLOSE = 3600000
+  return (date - now) <= TIME_TOO_CLOSE;
 }
 
 exports.makeDateTimeString = (date) => {
@@ -101,17 +116,6 @@ exports.getDistance = (request) => {
    */
 exports.convertTimeToMinutes = (date) => {
     return date.getHours()*60 + date.getMinutes()
-}
-
-exports.measureCompatibility = (request1, request2) => {
-    let compatibility = 0;
-    if(request1.cuisinePreference == request2.cuisinePreference) {
-      compatibility += 5;
-    }
-    if(request1.industryPreference == 12 || (request1.industryPreference == request2.industry)) {
-      compatibility += 5;
-    }
-    return compatibility;
 }
 
 exports.isBlocked = async(uid, otherUid) => {
@@ -185,6 +189,22 @@ exports.getThreshold = (request) => {
     // For now we just have a threshold of 18 points
     return 18;
 }
+
+exports.measureCompatibility = (request1, request2) => {
+  let compatibility = 0;
+  // Diet, Cuisine, Industry
+  if(request1.cuisinePreference == request2.cuisinePreference) {
+    compatibility += 5;
+  }
+  if(request1.industryPreference == 12 || (request1.industryPreference == request2.industry)) {
+    compatibility += 5;
+  }
+  return compatibility;
+}
+
+// exports.satisfactionThreshold = (request) => {
+//   return 
+// }
 
 function chatsRef(params) {
   return admin.database().ref(`Chats/${params}`);
