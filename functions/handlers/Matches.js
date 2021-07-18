@@ -43,6 +43,7 @@ const isUserBlocked = async(uid, otherUid) => {
 
 exports.findGobbleMate = async(data, context) => {
     let request = data.request;
+    let applyThreshold = false;
     let uid = await admin
     .auth()
     .verifyIdToken(data.idToken)
@@ -85,9 +86,7 @@ exports.findGobbleMate = async(data, context) => {
           coords2 = getCoords(child)
           distance2 = getDistance(child)
           date2 = getDatetime(child)
-          //It's strange but isBlocked is not recognized if imported
-          // from helpers
-          // This is a hackish way of having it be recognised.
+  
           let isBlocked1 = await isUserBlocked(request.userId, child.userId)
           let isBlocked2 = await isUserBlocked(child.userId, request.userId)
           let isBlocked = isBlocked1 || isBlocked2
@@ -152,7 +151,7 @@ exports.findGobbleMate = async(data, context) => {
  async function match(request1, request1Ref, request2, request2Ref) {
     let request2UserDetails = await getUserDetails(request2.userId)
     let request1UserDetails = await getUserDetails(request1.userId)
-    const pendingMatchID = await gobbleRequestsRef().child('ANY').child('ANY').push().key;
+    const pendingMatchID = await admin.database().ref().push().key;
     let updates = {};
     let dateString = makeDateString(getDatetime(request2))
     let dateTimeString = await makeDateTimeString(getDatetime(request2))

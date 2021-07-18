@@ -7,11 +7,10 @@ const fetcher = require('node-fetch')
 // firebase.initializeApp(config);
 
 exports.DIETARY_ARRAYS = {//was Bug
-    "Vegetarian": ["Vegetarian", 'Vegan', "ANY"],
-    "Halal": ["Halal", "ANY", "Vegetarian", "Vegan"],
-    "Vegan": ["Vegan", "ANY"],
-    "ANY": ["VEGAN", "VEGETARIAN", "HALAL", "ANY"],
-    "Any": ["VEGAN", "VEGETARIAN", "HALAL", "ANY"]
+    "Vegetarian": ["Vegetarian", 'Vegan', "Any"],
+    "Halal": ["Halal", "Any", "Vegetarian", "Vegan"],
+    "Vegan": ["Vegan", "Any", "Vegetarian"],
+    "Any": ["VEGAN", "VEGETARIAN", "HALAL", "Any"],
 }
 
 
