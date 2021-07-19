@@ -10,7 +10,9 @@ const {
   findingNearestQuarterTime,
   makeDateTimeString,
   getPushToken,
-  sendPushNotifications
+  sendPushNotifications,
+  ALL_DIETS,
+  getDatetimeArray
 } = require('./handlers/MatchingHelpers')
 
 const {
@@ -36,6 +38,7 @@ const {
   findGobbleMate,
   matchUnaccept,
   deleteAwaitingRequest,
+  scheduledFindGobbleMate,
 } = require('./handlers/Matches')
 
 const {
@@ -101,7 +104,7 @@ exports.scheduleAwaitingCleanUpFunction = functions.pubsub.schedule('1-59/15 * *
 exports.schedulePendingCleanUpFunction = functions.pubsub.schedule('1-59/15 * * * *').onRun(async(context) => {
   let updates = {}
   let now = new Date();
-  messsages = []
+  let messages = []
   now.setMinutes(findingNearestQuarterTime(now))
   let dateTimeString = makeDateTimeString(now);
   await admin.database().ref(`PendingMatchIDs/${dateTimeString}`)
@@ -133,5 +136,65 @@ exports.schedulePendingCleanUpFunction = functions.pubsub.schedule('1-59/15 * * 
     console.log("15 minute pending requests deletion complete")
   } catch(err) {
     console.log("15 minute pending requests deletion error " + err.message)
+  }
+})
+
+exports.periodicMatchFindingFunction = functions.pubsub.schedule('0-59/15 * * * *').onRun(async(context) => {
+  let now = new Date();
+  let todayString = makeDateString(now);
+  let matched = {};
+  for(let diet of ALL_DIETS) {
+    await admin.database().ref(`GobbleRequests/${todayString}/${diet}`).once("value",async(snapshot) => {
+      let requests = snapshot.val()
+      for(let [id, request] of Object.entries(requests)) {
+        if(!matched[id]) {
+          let response = await scheduledFindGobbleMate(request);
+          if(response.found) {
+            matched[response.match] = true;
+          }
+        }
+      }
+    })
+  }
+  if(now.getHours() == 23) {
+    for(let time of getDatetimeArray()) {
+      await admin.database().ref(`AwaitingPile/${time}`).once("value", async(snapshot) => {
+        let requests = snapshot.val()
+        for(let [id, request] of Object.entries(requests)) {
+          if(!matched[id]) {
+            let response = await scheduledFindGobbleMate(request);
+            if(response.found) {
+              matched[response.match] = true;
+            }
+          }
+        }
+      })
+    }
+  }
+  console.log(matched)
+})
+
+exports.userRequestsTableCleanup = functions.pubsub.schedule('1-59/15 * * * *').onRun(async(context) => {
+  let updates = {}
+  let now = new Date();
+  now.setMinutes(findingNearestQuarterTime(now))
+  let dateTimeString = makeDateTimeString(now);
+  await admin.database().ref(`MatchIDs/${dateTimeString}`)
+  .once("value").then(snapshot => {
+    let requests = snapshot.val();
+    for(let [key, value] of Object.entries(requests)) {
+      for(let id of Object.keys(value)) {
+        updates[`/UserRequests/${id}/${key}`] = null;
+        // updates[`/Users/${id}/matchIDs/${key}`] = null;
+      }
+    }
+  }).catch(err => console.log("15 minute MatchIDs clean up error " + err.message))
+  try {
+    updates[`/MatchIDs/${dateTimeString}`] = null;
+    console.log(updates)
+    await admin.database().ref().update(updates);
+    console.log("15 minute userRequests matchIDs deletion complete")
+  } catch(err) {
+    console.log("15 minute userRequests matchIDs deletion error " + err.message)
   }
 })

@@ -7,7 +7,6 @@ const {
   getCoords,
   getDatetime,
   getDistance,
-  getThreshold,
   makeDateString,
   makeDateTimeString,
   gobbleRequestsRef,
@@ -20,7 +19,11 @@ const {
   getPendingTime,
   getDatetimeFromObject,
   sendPushNotification,
-  getPushToken
+  getPushToken,
+  SATISFACTION_THRESHOLD,
+  STOP_SEARCH_THRESHOLD,
+  isGobbleTimeClose,
+  MINIMUM_COMPATIBILITY,
 } = require('./MatchingHelpers')
 
 const {
@@ -41,19 +44,11 @@ const isUserBlocked = async(uid, otherUid) => {
   return x;
 }
 
-exports.findGobbleMate = async(data, context) => {
-    let request = data.request;
-    let uid = await admin
-    .auth()
-    .verifyIdToken(data.idToken)
-    .then(decodedToken => {
-        return decodedToken.uid;
-    })
-    if(uid == null || uid != request.userId) {
-      console.log("Unauthorized request findGobbleMate")
+exports.scheduledFindGobbleMate = async(request) => {
+    if(!isGobbleTimeClose(request.datetime)) {
       return {
         found: false,
-        success: false,
+        success: true
       }
     }
     let date1 = getDatetime(request)
@@ -64,12 +59,10 @@ exports.findGobbleMate = async(data, context) => {
     let coords1 = getCoords(request)
     let distance1 = getDistance(request)
     let bestMatch = null;
-    let bestMatchCompatibility = 5;
+    let bestMatchCompatibility = -1;
     let dietaryRef;
     let counter = 0;
     let dietaryOptionsArray = DIETARY_ARRAYS[`${request.dietaryRestriction}`]
-    let result = false;
-    let response;
     // IF THE USER IS ANY, WE NEED TO SEARCH ALL THE PENDING REQUESTS
     for(;counter < dietaryOptionsArray.length; counter++) {
       const dietaryOption = dietaryOptionsArray[counter];
@@ -100,13 +93,7 @@ exports.findGobbleMate = async(data, context) => {
           }
           compatibility = await measureCompatibility(request, child) + measureCompatibility(child, request)
           console.log(compatibility, 'compatiblity');
-          if (compatibility >= getThreshold()) {//for now threshold is 18 arbitrarily
-            console.log('greater than threshold');
-            response = await match(request, null, child, iterator);
-            result = true;
-            console.log("EARLY TERMINATION")
-            break;
-          } else if (compatibility > bestMatchCompatibility) {
+          if (compatibility > bestMatchCompatibility) {
             console.log('new best compatibility');
             bestMatchCompatibility = compatibility
             bestMatch = child;
@@ -114,23 +101,17 @@ exports.findGobbleMate = async(data, context) => {
           }
         }
       })
-      if(result) {
-        return {
-          found: true,
-          success: true, 
-        };
-      }
     }
     if (counter === dietaryOptionsArray.length) {
         if (bestMatch != null) {
           console.log("AT THE END OF LOOP");
-          await match(request, null, bestMatch, dietaryRef);
+          await match(request, true, bestMatch, dietaryRef);
           return {
             found: true,
             success: true, 
+            match: bestMatch.matchID
           };
         } else {
-          await makeGobbleRequest(ref, request, date1)
           // Match not found, user may receive push notification later (or else scheduling push notifications)
           return {
             found: false,
@@ -140,6 +121,108 @@ exports.findGobbleMate = async(data, context) => {
     }
 }
 
+exports.findGobbleMate = async(data, context) => {
+  let request = data.request;
+  let uid = await admin
+  .auth()
+  .verifyIdToken(data.idToken)
+  .then(decodedToken => {
+      return decodedToken.uid;
+  })
+  if(uid == null || uid != request.userId) {
+    console.log("Unauthorized request findGobbleMate")
+    return {
+      found: false,
+      success: false,
+    }
+  }
+  if(!isGobbleTimeClose(request.datetime)) {
+    return findGobbleMateWithThresholds(request);
+  }
+  let date1 = getDatetime(request)
+  let ref = gobbleRequestsRef()
+  .child(makeDateString(date1))
+  //TODO: Stop users from entering matches with same datetime
+  let tempRef;
+  let coords1 = getCoords(request)
+  let distance1 = getDistance(request)
+  let bestMatch = null;
+  let bestMatchCompatibility = -1;
+  let dietaryRef;
+  let counter = 0;
+  let dietaryOptionsArray = DIETARY_ARRAYS[`${request.dietaryRestriction}`]
+  let result = false;
+  let response;
+  // IF THE USER IS ANY, WE NEED TO SEARCH ALL THE PENDING REQUESTS
+  for(;counter < dietaryOptionsArray.length; counter++) {
+    const dietaryOption = dietaryOptionsArray[counter];
+    console.log('looking through ' + dietaryOption);
+    tempRef = ref.child(`${dietaryOption}`);
+    await tempRef.once("value").then(async(snapshot) => {//values in same day under dietaryOption
+      let iterator, child;
+      let coords2, distance2, date2;
+      let children = snapshot.val()
+      let compatibility
+      for(iterator in children) {//iterate through these values
+        child = children[iterator]
+        coords2 = getCoords(child)
+        distance2 = getDistance(child)
+        date2 = getDatetime(child)
+
+        let isBlocked1 = await isUserBlocked(request.userId, child.userId)
+        let isBlocked2 = await isUserBlocked(child.userId, request.userId)
+        let isBlocked = isBlocked1 || isBlocked2
+        if(!isWithinRange(coords1, distance1, coords2, distance2) || 
+        !isWithinTime(date1, date2) || isBlocked ||
+        request.userId === child.userId) {
+          console.log(child.userId)
+          console.log(isWithinRange(coords1, distance1, coords2, distance2))
+          console.log(coords1, distance1, coords2, distance2)
+          console.log('out of range/time/same user/blocked');
+          continue;
+        }
+        compatibility = await measureCompatibility(request, child) + measureCompatibility(child, request)
+        console.log(compatibility, 'compatiblity');
+        if (compatibility >= 2*STOP_SEARCH_THRESHOLD) {//for now threshold is 18 arbitrarily
+          console.log('greater than threshold');
+          response = await match(request, null, child, iterator);
+          result = true;
+          console.log("EARLY TERMINATION")
+          break;
+        } else if (compatibility > bestMatchCompatibility) {
+          console.log('new best compatibility');
+          bestMatchCompatibility = compatibility
+          bestMatch = child;
+          dietaryRef = iterator; 
+        }
+      }
+    })
+    if(result) {
+      return {
+        found: true,
+        success: true, 
+      };
+    }
+  }
+  if (counter === dietaryOptionsArray.length) {
+      if (bestMatch != null) {
+        console.log("AT THE END OF LOOP");
+        await match(request, null, bestMatch, dietaryRef);
+        return {
+          found: true,
+          success: true, 
+        };
+      } else {
+        await makeGobbleRequest(ref, request, date1)
+        // Match not found, user may receive push notification later (or else scheduling push notifications)
+        return {
+          found: false,
+          success: true,
+        }
+      }
+  }
+}
+
 /**
    * Handling database operations when two users match
    * @param {*} request1 request sent by first user
@@ -147,7 +230,7 @@ exports.findGobbleMate = async(data, context) => {
    * @param {*} request2 request sent by second user
    * @param {*} request2Ref pending match ID of request2 in GobbleRequests and within the user object itself
    */
- async function match(request1, request1Ref, request2, request2Ref) {
+ async function match(request1, sendNotifsToBothUsers, request2, request2Ref) {
     let request2UserDetails = await getUserDetails(request2.userId)
     let request1UserDetails = await getUserDetails(request1.userId)
     const pendingMatchID = await admin.database().ref().push().key;
@@ -194,7 +277,100 @@ exports.findGobbleMate = async(data, context) => {
       //After performing all updates, send push notif to other user about match
     let pushToken = await getPushToken(request2.userId);
     sendPushNotification(pushToken, 'We found you a Match!', 'You can view it in the Matches tab');
+    if(sendNotifsToBothUsers) {
+      let pushToken2 = await getPushToken(request1.userId);
+      sendPushNotification(pushToken2, 'We found you a Match!', 'You can view it in the Matches tab');
+    }
     return true;
+}
+
+const findGobbleMateWithThresholds = async(request) => {
+  let date1 = getDatetime(request)
+  let ref = gobbleRequestsRef()
+  .child(makeDateString(date1))
+  //TODO: Stop users from entering matches with same datetime
+  let tempRef;
+  let coords1 = getCoords(request)
+  let distance1 = getDistance(request)
+  let bestMatch = null;
+  let bestMatchCompatibility = 5;
+  let dietaryRef;
+  let counter = 0;
+  let dietaryOptionsArray = DIETARY_ARRAYS[`${request.dietaryRestriction}`]
+  let result = false;
+  let response;
+  // IF THE USER IS ANY, WE NEED TO SEARCH ALL THE PENDING REQUESTS
+  for(;counter < dietaryOptionsArray.length; counter++) {
+    const dietaryOption = dietaryOptionsArray[counter];
+    console.log('looking through ' + dietaryOption);
+    tempRef = ref.child(`${dietaryOption}`);
+    await tempRef.once("value").then(async(snapshot) => {//values in same day under dietaryOption
+      let iterator, child;
+      let coords2, distance2, date2;
+      let children = snapshot.val()
+      let compatibility
+      for(iterator in children) {//iterate through these values
+        child = children[iterator]
+        coords2 = getCoords(child)
+        distance2 = getDistance(child)
+        date2 = getDatetime(child)
+
+        let isBlocked1 = await isUserBlocked(request.userId, child.userId)
+        let isBlocked2 = await isUserBlocked(child.userId, request.userId)
+        let isBlocked = isBlocked1 || isBlocked2
+        if(!isWithinRange(coords1, distance1, coords2, distance2) || 
+        !isWithinTime(date1, date2) || isBlocked ||
+        request.userId === child.userId) {
+          console.log(child.userId)
+          console.log(isWithinRange(coords1, distance1, coords2, distance2))
+          console.log(coords1, distance1, coords2, distance2)
+          console.log('out of range/time/same user/blocked');
+          continue;
+        }
+        let requestCompatibility = await measureCompatibility(request, child) 
+        let childCompatibility = await measureCompatibility(child, request)
+        let totalCompatibility = requestCompatibility + childCompatibility;
+        if (requestCompatibility >= STOP_SEARCH_THRESHOLD && 
+        childCompatibility >= STOP_SEARCH_THRESHOLD) {//for now threshold is 18 arbitrarily
+          console.log('greater than threshold');
+          response = await match(request, null, child, iterator);
+          result = true;
+          console.log("EARLY TERMINATION")
+          break;
+        } else if (totalCompatibility > bestMatchCompatibility && 
+          requestCompatibility >= SATISFACTION_THRESHOLD && 
+          childCompatibility >= SATISFACTION_THRESHOLD) {
+          console.log('new best compatibility');
+          bestMatchCompatibility = totalCompatibility
+          bestMatch = child;
+          dietaryRef = iterator; 
+        }
+      }
+    })
+    if(result) {
+      return {
+        found: true,
+        success: true, 
+      };
+    }
+  }
+  if (counter === dietaryOptionsArray.length) {
+      if (bestMatch != null) {
+        console.log("AT THE END OF LOOP");
+        await match(request, null, bestMatch, dietaryRef);
+        return {
+          found: true,
+          success: true, 
+        };
+      } else {
+        await makeGobbleRequest(ref, request, date1)
+        // Match not found, user may receive push notification later (or else scheduling push notifications)
+        return {
+          found: false,
+          success: true,
+        }
+      }
+  }
 }
 
 /**
@@ -315,11 +491,15 @@ async function matchFinalise(request) {
       message: FINAL_FAIL
     }
   });
+  let requestPendingTimeString = makeDateTimeString(getPendingTime(request))
 
   updates[`/Users/${request.userId}/matchIDs/${request.matchID}`] = request
   updates[`/Users/${request.otherUserId}/matchIDs/${request.matchID}`] = otherUserRequest
-
-  updates[`/PendingMatchIDs/${makeDateTimeString(getPendingTime(request))}/${request.matchID}`] = null
+  updates[`/MatchIDs/${requestPendingTimeString}/${request.matchID}`] = {
+    userId: request.userId,
+    otherUserId: request.otherUserId
+  };
+  updates[`/PendingMatchIDs/${requestPendingTimeString}/${request.matchID}`] = null
   updates[`/Users/${request.userId}/pendingMatchIDs/${request.matchID}`] = null
   updates[`/Users/${request.otherUserId}/pendingMatchIDs/${request.matchID}`] = null
 
