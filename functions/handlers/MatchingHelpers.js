@@ -11,15 +11,79 @@ exports.DIETARY_ARRAYS = {//was Bug
   "Strictly Vegetarian": ["Strictly Vegetarian", "Vegetarian", "Any"],
   "Halal": ["Strictly Halal", "Halal", "Any", "Vegetarian"],
   "Strictly Halal": ["Strictly Halal", "Halal", "Any"],
-  "Any": ["Any", "Vegetarian", "Halal"],
+  "Any": ["Any", "Halal", "Vegetarian"],
 }
 
+exports.ALL_DIETS = ["Strictly Vegetarian", "Vegetarian", "Strictly Halal", "Halal", "Any"]
+
 const DIET_SCORE_CALCULATION = {
-  "Strictly Vegetarian": {},
-  "Vegetarian": {},
-  "Halal": {},
-  "Strictly Halal": {},
-  "Any": {}
+  "Vegetarian": {
+    "Strictly Vegetarian": 5,
+    "Vegetarian": 5, 
+    "Any": 5, 
+    "Halal": 3
+  },
+  "Strictly Vegetarian": {
+    "Strictly Vegetarian": 5,
+    "Vegetarian": 5,
+    "Any": 5
+  },
+  "Halal": {
+    "Strictly Halal": 5, 
+    "Halal": 5, 
+    "Any": 5, 
+    "Vegetarian": 3
+  },
+  "Strictly Halal": {
+    "Strictly Halal": 5, 
+    "Halal": 5, 
+    "Any": 5, 
+  },
+  "Any": {
+    "Strictly Vegetarian": 4,
+    "Halal": 5,
+    "Strictly Halal": 4,
+    "Vegetarian": 5, 
+    "Any": 5
+  }
+}
+
+const CUISINE_SCORE_CALCULATION = {
+  "Indian": {
+    "Indian": 4,
+    "Any": 4,
+    "Asian": 3,
+    "Food Court": 3,
+    "Western": 3
+  },
+  "Asian": {
+    "Indian": 3,
+    "Any": 4,
+    "Asian": 4,
+    "Food Court": 3,
+    "Western": 3
+  },
+  "Food Court": {
+    "Indian": 3,
+    "Any": 4,
+    "Asian": 3,
+    "Food Court": 4,
+    "Western": 3
+  },
+  "Western": {
+    "Indian": 3,
+    "Any": 4,
+    "Asian": 3,
+    "Food Court": 3,
+    "Western": 4
+  },
+  "Any": {
+    "Indian": 4,
+    "Any": 4,
+    "Asian": 4,
+    "Food Court": 4,
+    "Western": 4
+  }
 }
 
 
@@ -118,6 +182,30 @@ exports.convertTimeToMinutes = (date) => {
     return date.getHours()*60 + date.getMinutes()
 }
 
+exports.getDatetimeArray = () => {
+  let date = new Date();
+  let minutes = date.getMinutes();
+  date.setDate(date.getDate() +1)
+  date.setHours(0)
+  date.setMinutes(0)
+  date.setSeconds(0)
+  date.setMilliseconds(0)
+  let arr = [this.makeDateTimeString(date)]
+  if(minutes > 15) {
+    date.setMinutes(15)
+    arr.push(this.makeDateTimeString(date))
+  }
+  if(minutes > 30) {
+    date.setMinutes(30)
+    arr.push(this.makeDateTimeString(date))
+  }
+  if(minutes > 45) {
+    date.setMinutes(45)
+    arr.push(this.makeDateTimeString(date))
+  }
+  return arr;
+}
+
 exports.isBlocked = async(uid, otherUid) => {
     let x = false;
     x = await admin.database().ref(`Users/${uid}/blockedUsers/${otherUid}`)
@@ -175,36 +263,23 @@ exports.getDatetimeFromObject = (request) => {
   return request['datetime']
 }
 
-/**
-   * Threshold for when matching algorithm can stop and return
-   * This is supposed to be dynamic
-   * Will be improved in phase 3
-   * @param {*} request request sent by user
-   * @returns a score number value
-   */
-exports.getThreshold = (request) => {
-    // Will have a threshold function to mark how low a score we are willing to accept for a match
-    // Nearer to the schedule time, the lower the threshold
-    // This is for milestone 3
-    // For now we just have a threshold of 18 points
-    return 18;
-}
-
 exports.measureCompatibility = (request1, request2) => {
   let compatibility = 0;
   // Diet, Cuisine, Industry
-  if(request1.cuisinePreference == request2.cuisinePreference) {
-    compatibility += 5;
-  }
   if(request1.industryPreference == 12 || (request1.industryPreference == request2.industry)) {
-    compatibility += 5;
+    compatibility += 4;
+  } else {
+    compatibility += 2;
   }
+  compatibility += DIET_SCORE_CALCULATION[request1.dietaryPreference][request2.dietaryPreference]
+  compatibility += CUISINE_SCORE_CALCULATION[request1.cuisinePreference][request2.cuisinePreference]
+
   return compatibility;
 }
 
-// exports.satisfactionThreshold = (request) => {
-//   return 
-// }
+exports.SATISFACTION_THRESHOLD = 11;
+exports.STOP_SEARCH_THRESHOLD = 13;
+exports.MINIMUM_COMPATIBILITY = 16;
 
 function chatsRef(params) {
   return admin.database().ref(`Chats/${params}`);
