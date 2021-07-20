@@ -340,6 +340,21 @@ exports.promoteToAdmin = (data, context) => {
     }));
 };
 
+const deleteImage = (uid) => {
+    if (uid === null) {
+        return false;
+    } else {
+        const ref = firebase.storage().ref('avatar').child(uid);
+        return ref
+            .delete()
+            .then(() => true)
+            .catch(err => {
+                console.log('Image Not Deleted from Cloud Storage: ', err.message);
+                return false;
+            });
+    }
+};
+
 exports.deleteAccount = (data, context) => {
     // Verify the ID token while checking if the token is revoked by passing
     // checkRevoked true.
@@ -361,6 +376,7 @@ exports.deleteAccount = (data, context) => {
             .deleteUser(uid)
             .then(() => {
             if (deleteUserCollection(uid)) {
+                deleteImage(uid);
                 console.log('Successfully deleted user');
                 return ({
                     success: true,

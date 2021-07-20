@@ -129,6 +129,10 @@ exports.findGobbleMate = async(data, context) => {
   .then(decodedToken => {
       return decodedToken.uid;
   })
+  .catch(err => {
+    console.error('FINDGOBBLEMATE ADMIN ERROR:', err.message);
+    return null;
+  })
   if(uid == null || uid != request.userId) {
     console.log("Unauthorized request findGobbleMate")
     return {
@@ -181,7 +185,7 @@ exports.findGobbleMate = async(data, context) => {
           console.log('out of range/time/same user/blocked');
           continue;
         }
-        compatibility = await measureCompatibility(request, child) + measureCompatibility(child, request)
+        compatibility = await (measureCompatibility(request, child) + measureCompatibility(child, request));
         console.log(compatibility, 'compatiblity');
         if (compatibility >= 2*STOP_SEARCH_THRESHOLD) {//for now threshold is 18 arbitrarily
           console.log('greater than threshold');

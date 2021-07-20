@@ -22,7 +22,7 @@ const {
   updateFullAuthUser,
   promoteToAdmin,
   addPushTokenToDatabase,
-  deleteAccount,
+  deleteAccount
 } = require('./handlers/Users');
 
 const {
@@ -63,7 +63,6 @@ exports.deleteReport = functions.https.onCall(deleteReport)
 exports.deleteAwaitingRequest = functions.https.onCall(deleteAwaitingRequest)
 
 
-
 //Scheduled Functions
 exports.scheduleAwaitingCleanUpFunction = functions.pubsub.schedule('1-59/15 * * * *').onRun(async(context) => {
   let updates = {}
@@ -88,16 +87,20 @@ exports.scheduleAwaitingCleanUpFunction = functions.pubsub.schedule('1-59/15 * *
         })
       }
     }
-  }).catch(err => console.log("15 minute awaitingmatchIDs clean up error " + err.message))
-  if(messages != []) {
+  }).catch(err => {
+    if (!(messages.length == 0)) {
+      console.log("15 minute awaitingmatchIDs clean up error " + err.message);
+    }
+  });
+  if(messages.length != 0) {
     sendPushNotifications(messages);
   }
   try {
     updates[`/AwaitingPile/${todayTimeString}`] = null
     await admin.database().ref().update(updates);
-    console.log("15 minute awaiting requests deletion complete")
+    // console.log("15 minute awaiting requests deletion complete")
   } catch(err) {
-    console.log("15 minute awaiting requests deletion error " + err.message)
+    console.log("15 minute awaiting requests deletion error " + err.message);
   }
 })
 
@@ -125,15 +128,17 @@ exports.schedulePendingCleanUpFunction = functions.pubsub.schedule('1-59/15 * * 
         }
       }
     }
-  }).catch(err => console.log("15 minute awaitingmatchIDs clean up error " + err.message))
+  }).catch(err => {
+    if (!(messages.length == 0)) {
+      console.log("15 minute awaitingmatchIDs clean up error " + err.message);  
+    }
+  });
   if(messages != []) {
     sendPushNotifications(messages);
   }
   try {
     updates[`PendingMatchIDs/${dateTimeString}`] = null;
-    console.log(updates)
     await admin.database().ref().update(updates);
-    console.log("15 minute pending requests deletion complete")
   } catch(err) {
     console.log("15 minute pending requests deletion error " + err.message)
   }
@@ -171,7 +176,7 @@ exports.periodicMatchFindingFunction = functions.pubsub.schedule('0-59/15 * * * 
       })
     }
   }
-  console.log(matched)
+  // console.log(matched)
 })
 
 exports.userRequestsTableCleanup = functions.pubsub.schedule('1-59/15 * * * *').onRun(async(context) => {
@@ -188,12 +193,14 @@ exports.userRequestsTableCleanup = functions.pubsub.schedule('1-59/15 * * * *').
         // updates[`/Users/${id}/matchIDs/${key}`] = null;
       }
     }
-  }).catch(err => console.log("15 minute MatchIDs clean up error " + err.message))
+  }).catch(err => {
+    if (!(messages.length == 0)) {
+      console.log("15 minute awaitingmatchIDs clean up error " + err.message);
+    }
+  });
   try {
     updates[`/MatchIDs/${dateTimeString}`] = null;
-    console.log(updates)
     await admin.database().ref().update(updates);
-    console.log("15 minute userRequests matchIDs deletion complete")
   } catch(err) {
     console.log("15 minute userRequests matchIDs deletion error " + err.message)
   }

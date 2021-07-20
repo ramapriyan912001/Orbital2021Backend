@@ -73,10 +73,16 @@ function removeBlockedUserMatches(uid, otherUid, matches) {
         updates[`/Chats/${otherUid}/${uid}`] = null
         try {
           admin.database().ref().update(updates)
-          return BLOCK_SUCCESS
+          return {
+            success: true,
+            message: BLOCK_SUCCESS
+          }
         } catch(err) {
           console.log("Block user error: " + err)
-          return BLOCK_FAILURE
+          return {
+            success: false,
+            message: BLOCK_FAILURE,
+          };
         }
       }
     )
@@ -102,10 +108,16 @@ function removeBlockedUserMatches(uid, otherUid, matches) {
     updates[`/Users/${uid}/blockedUsers/${otherUid}`] = null;
     try {
       await admin.database().ref().update(updates)
-      return UNBLOCK_SUCCESS
+      return {
+        success: true,
+        message: UNBLOCK_SUCCESS,
+      }
     } catch(err) {
       console.log("Block user error: " + err)
-      return UNBLOCK_FAILURE
+      return {
+        success: false,
+        message: UNBLOCK_FAILURE,
+      }
     }
 }
 

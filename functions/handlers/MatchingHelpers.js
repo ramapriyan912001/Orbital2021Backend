@@ -271,7 +271,7 @@ exports.measureCompatibility = (request1, request2) => {
   } else {
     compatibility += 2;
   }
-  compatibility += DIET_SCORE_CALCULATION[request1.dietaryPreference][request2.dietaryPreference]
+  compatibility += DIET_SCORE_CALCULATION[request1.dietaryRestriction][request2.dietaryRestriction]
   compatibility += CUISINE_SCORE_CALCULATION[request1.cuisinePreference][request2.cuisinePreference]
 
   return compatibility;
