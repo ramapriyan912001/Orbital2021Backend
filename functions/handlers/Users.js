@@ -156,11 +156,19 @@ exports.deleteUserByUID = (data, context) => {
             .deleteUser(data.uid)
             .then(() => {
             if (deleteUserCollection(data.uid)) {
+                if (deleteImage(data.uid)) {
                 console.log('ADMIN: Successfully deleted user');
                 return ({
                     success: true,
                     message: `User ${data.uid} has been deleted!`
                 });
+                } else {
+                    console.log('ADMIN: Error deleting User Storage Avatar');
+                    return ({
+                        success: false,
+                        message: `ADMIN DELETE USER ERROR: Auth & Collection deleted but Storage Avatar not deleted`
+                    });    
+                }
             } else {
                 console.log('ADMIN: Error deleting User Collection');
                 return ({
@@ -344,7 +352,7 @@ const deleteImage = (uid) => {
     if (uid === null) {
         return false;
     } else {
-        const ref = firebase.storage().ref('avatar').child(uid);
+        const ref = admin.storage().ref('avatar').child(uid);
         return ref
             .delete()
             .then(() => true)
