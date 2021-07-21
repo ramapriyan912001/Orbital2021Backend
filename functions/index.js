@@ -64,7 +64,7 @@ exports.deleteAwaitingRequest = functions.https.onCall(deleteAwaitingRequest)
 
 
 //Scheduled Functions
-exports.scheduleAwaitingCleanUpFunction = functions.pubsub.schedule('1-59/15 * * * *').onRun(async(context) => {
+exports.scheduleAwaitingCleanUpFunction = functions.pubsub.schedule('1-59/16 * * * *').onRun(async(context) => {
   let updates = {}
   let now = new Date();
   now.setMinutes(findingNearestQuarterTime(now))
@@ -74,17 +74,19 @@ exports.scheduleAwaitingCleanUpFunction = functions.pubsub.schedule('1-59/15 * *
   await admin.database().ref(`AwaitingPile/${makeDateTimeString(now)}`)
   .once("value").then(snapshot => {
     let requests = snapshot.val();
-    for(let [key, value] of Object.entries(requests)) {
-      updates[`/UserRequests/${value.userId}/${key}`] = null;
-      updates[`/Users/${value.userId}/awaitingMatchIDs/${key}`] = null;
-      updates[`/GobbleRequests/${todayString}/${value.dietaryRestriction}`] = null;
-      const userPushToken = getPushToken(value.userId)
-      if(userPushToken != null) {
-        messages.push({
-          to: userPushToken,
-          title: 'Time elapsed on your Gobble request!',
-          body: 'Make another request and find a Gobblemate!'
-        })
+    if(requests != null) {
+      for(let [key, value] of Object.entries(requests)) {
+        updates[`/UserRequests/${value.userId}/${key}`] = null;
+        updates[`/Users/${value.userId}/awaitingMatchIDs/${key}`] = null;
+        updates[`/GobbleRequests/${todayString}/${value.dietaryRestriction}`] = null;
+        const userPushToken = getPushToken(value.userId)
+        if(userPushToken != null) {
+          messages.push({
+            to: userPushToken,
+            title: 'Time elapsed on your Gobble request!',
+            body: 'Make another request and find a Gobblemate!'
+          })
+        }
       }
     }
   }).catch(err => {
@@ -113,18 +115,20 @@ exports.schedulePendingCleanUpFunction = functions.pubsub.schedule('1-59/15 * * 
   await admin.database().ref(`PendingMatchIDs/${dateTimeString}`)
   .once("value").then(snapshot => {
     let requests = snapshot.val();
-    for(let [key, value] of Object.entries(requests)) {
-      let ids = Object.keys(value)
-      for(let id of ids) {
-        updates[`/UserRequests/${id}/${key}`] = null;
-        updates[`/Users/${id}/pendingMatchIDs/${key}`] = null;
-        let userPushToken = getPushToken(id)
-        if(userPushToken != null) {
-          messages.push({
-            to: userPushToken,
-            title: 'Time elapsed on your Pending Match!',
-            body: 'Make another request and find a Gobblemate!'
-          })
+    if(requests != null) {
+      for(let [key, value] of Object.entries(requests)) {
+        let ids = Object.keys(value)
+        for(let id of ids) {
+          updates[`/UserRequests/${id}/${key}`] = null;
+          updates[`/Users/${id}/pendingMatchIDs/${key}`] = null;
+          let userPushToken = getPushToken(id)
+          if(userPushToken != null) {
+            messages.push({
+              to: userPushToken,
+              title: 'Time elapsed on your Pending Match!',
+              body: 'Make another request and find a Gobblemate!'
+            })
+          }
         }
       }
     }
@@ -151,25 +155,30 @@ exports.periodicMatchFindingFunction = functions.pubsub.schedule('0-59/15 * * * 
   for(let diet of ALL_DIETS) {
     await admin.database().ref(`GobbleRequests/${todayString}/${diet}`).once("value",async(snapshot) => {
       let requests = snapshot.val()
-      for(let [id, request] of Object.entries(requests)) {
-        if(!matched[id]) {
-          let response = await scheduledFindGobbleMate(request);
-          if(response.found) {
-            matched[response.match] = true;
+      if(requests != null) {
+        for(let [id, request] of Object.entries(requests)) {
+          if(!matched[id]) {
+            let response = await scheduledFindGobbleMate(request);
+            if(response.found) {
+              matched[response.match] = true;
+            }
           }
         }
       }
+      
     })
   }
   if(now.getHours() == 23) {
     for(let time of getDatetimeArray()) {
       await admin.database().ref(`AwaitingPile/${time}`).once("value", async(snapshot) => {
         let requests = snapshot.val()
-        for(let [id, request] of Object.entries(requests)) {
-          if(!matched[id]) {
-            let response = await scheduledFindGobbleMate(request);
-            if(response.found) {
-              matched[response.match] = true;
+        if(requests != null) {
+          for(let [id, request] of Object.entries(requests)) {
+            if(!matched[id]) {
+              let response = await scheduledFindGobbleMate(request);
+              if(response.found) {
+                matched[response.match] = true;
+              }
             }
           }
         }
@@ -187,10 +196,12 @@ exports.userRequestsTableCleanup = functions.pubsub.schedule('1-59/15 * * * *').
   await admin.database().ref(`MatchIDs/${dateTimeString}`)
   .once("value").then(snapshot => {
     let requests = snapshot.val();
-    for(let [key, value] of Object.entries(requests)) {
-      for(let id of Object.keys(value)) {
-        updates[`/UserRequests/${id}/${key}`] = null;
-        // updates[`/Users/${id}/matchIDs/${key}`] = null;
+    if(requests != null) {
+      for(let [key, value] of Object.entries(requests)) {
+        for(let id of Object.keys(value)) {
+          updates[`/UserRequests/${id}/${key}`] = null;
+          // updates[`/Users/${id}/matchIDs/${key}`] = null;
+        }
       }
     }
   }).catch(err => {
