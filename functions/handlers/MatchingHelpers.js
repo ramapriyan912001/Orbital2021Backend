@@ -223,6 +223,11 @@ exports.findingNearestQuarterTime = (date) => {
   return Math.floor(minutes/15)*15
 }
 
+exports.findNextQuarterTime = (date) => {
+  let minutes = date.getMinutes();
+  return (Math.ceil(minutes/15)*15)%60
+}
+
 /**
    * Calculate distance between two users using coordinates provided
    * @param {*} coords1 coordinates of first user's location
@@ -267,18 +272,20 @@ exports.measureCompatibility = (request1, request2) => {
   let compatibility = 0;
   // Diet, Cuisine, Industry
   if(request1.industryPreference == 12 || (request1.industryPreference == request2.industry)) {
-    compatibility += 4;
+    compatibility += 3;
   } else {
     compatibility += 2;
   }
-  compatibility += DIET_SCORE_CALCULATION[request1.dietaryPreference][request2.dietaryPreference]
+  console.log("restriction 1", request1.dietaryRestriction)
+  console.log("restriction 2", request2.dietaryRestriction)
+  compatibility += DIET_SCORE_CALCULATION[request1.dietaryRestriction][request2.dietaryRestriction]
   compatibility += CUISINE_SCORE_CALCULATION[request1.cuisinePreference][request2.cuisinePreference]
 
   return compatibility;
 }
 
-exports.SATISFACTION_THRESHOLD = 11;
-exports.STOP_SEARCH_THRESHOLD = 13;
+exports.SATISFACTION_THRESHOLD = 10;
+exports.STOP_SEARCH_THRESHOLD = 12;
 exports.MINIMUM_COMPATIBILITY = 16;
 
 function chatsRef(params) {

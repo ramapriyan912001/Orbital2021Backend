@@ -78,7 +78,6 @@ exports.scheduledFindGobbleMate = async(request) => {
           coords2 = getCoords(child)
           distance2 = getDistance(child)
           date2 = getDatetime(child)
-  
           let isBlocked1 = await isUserBlocked(request.userId, child.userId)
           let isBlocked2 = await isUserBlocked(child.userId, request.userId)
           let isBlocked = isBlocked1 || isBlocked2
@@ -119,6 +118,94 @@ exports.scheduledFindGobbleMate = async(request) => {
           }
         }
     }
+}
+
+exports.findGobbleMateHelper = async(request) => {
+  if(!isGobbleTimeClose(request.datetime)) {
+    return findGobbleMateWithThresholds(request);
+  }
+  let date1 = getDatetime(request)
+  let ref = gobbleRequestsRef()
+  .child(makeDateString(date1))
+  //TODO: Stop users from entering matches with same datetime
+  let tempRef;
+  let coords1 = getCoords(request)
+  let distance1 = getDistance(request)
+  let bestMatch = null;
+  let bestMatchCompatibility = -1;
+  let dietaryRef;
+  let counter = 0;
+  let dietaryOptionsArray = DIETARY_ARRAYS[`${request.dietaryRestriction}`]
+  let result = false;
+  let response;
+  // IF THE USER IS ANY, WE NEED TO SEARCH ALL THE PENDING REQUESTS
+  for(;counter < dietaryOptionsArray.length; counter++) {
+    const dietaryOption = dietaryOptionsArray[counter];
+    console.log('looking through ' + dietaryOption);
+    tempRef = ref.child(`${dietaryOption}`);
+    await tempRef.once("value").then(async(snapshot) => {//values in same day under dietaryOption
+      let iterator, child;
+      let coords2, distance2, date2;
+      let children = snapshot.val()
+      let compatibility
+      for(iterator in children) {//iterate through these values
+        child = children[iterator]
+        coords2 = getCoords(child)
+        distance2 = getDistance(child)
+        date2 = getDatetime(child)
+
+        let isBlocked1 = await isUserBlocked(request.userId, child.userId)
+        let isBlocked2 = await isUserBlocked(child.userId, request.userId)
+        let isBlocked = isBlocked1 || isBlocked2
+        if(!isWithinRange(coords1, distance1, coords2, distance2) || 
+        !isWithinTime(date1, date2) || isBlocked ||
+        request.userId === child.userId) {
+          console.log(child.userId)
+          console.log(isWithinRange(coords1, distance1, coords2, distance2))
+          console.log(coords1, distance1, coords2, distance2)
+          console.log('out of range/time/same user/blocked');
+          continue;
+        }
+        compatibility = await measureCompatibility(request, child) + measureCompatibility(child, request)
+        console.log(compatibility, 'compatiblity');
+        if (compatibility >= 2*STOP_SEARCH_THRESHOLD) {//for now threshold is 18 arbitrarily
+          console.log('greater than threshold');
+          response = await match(request, null, child, iterator);
+          result = true;
+          console.log("EARLY TERMINATION")
+          break;
+        } else if (compatibility > bestMatchCompatibility) {
+          console.log('new best compatibility');
+          bestMatchCompatibility = compatibility
+          bestMatch = child;
+          dietaryRef = iterator; 
+        }
+      }
+    })
+    if(result) {
+      return {
+        found: true,
+        success: true, 
+      };
+    }
+  }
+  if (counter === dietaryOptionsArray.length) {
+      if (bestMatch != null) {
+        console.log("AT THE END OF LOOP");
+        await match(request, null, bestMatch, dietaryRef);
+        return {
+          found: true,
+          success: true, 
+        };
+      } else {
+        await makeGobbleRequest(ref, request, date1)
+        // Match not found, user may receive push notification later (or else scheduling push notifications)
+        return {
+          found: false,
+          success: true,
+        }
+      }
+  }
 }
 
 exports.findGobbleMate = async(data, context) => {
