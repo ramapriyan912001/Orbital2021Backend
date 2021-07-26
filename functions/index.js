@@ -201,35 +201,35 @@ exports.userRequestsTableCleanup = functions.pubsub.schedule('1-59/15 * * * *').
   }
 })
 
-exports.createMatchesForEveryone = functions.pubsub.schedule('1 16 * * *').onRun(async (context) => {
-  let now = new Date();
-  let tomorrow = new Date();
-  let nextQuarterTime = findNextQuarterTime(now);
-  now.setMinutes(nextQuarterTime)
-  now.setSeconds(0)
-  now.setMilliseconds(0)
-  tomorrow.setSeconds(0)
-  tomorrow.setMilliseconds(0)
-  tomorrow.setMinutes(nextQuarterTime)
-  tomorrow.setDate(now.getDate() + 1);
-  let request = {
-    userId: 'P04uDRqH0tOIfXw89tJXTlFidqC3',
-    industry: 0,
-    industryPreference: 12,
-    location: {
-      coords: {
-        latitude: 1.3236038,
-        longitude: 103.9273405
-      }
-    },
-    distance: 200,
-    dietaryRestriction: 'Any',
-    description: "Bedok, Singapore",
-    cuisinePreference: "Western",
-  }
-  while(tomorrow - now > 0) {
-    console.log('now', now);
-    findGobbleMateHelper({...request, datetime: now.toString()})
-    now.setMinutes(now.getMinutes() + 15)
-  }
-})
+// exports.createMatchesForEveryone = functions.pubsub.schedule('1 16 * * *').onRun(async (context) => {
+//   let now = new Date();
+//   let tomorrow = new Date();
+//   let nextQuarterTime = findNextQuarterTime(now);
+//   now.setMinutes(nextQuarterTime)
+//   now.setSeconds(0)
+//   now.setMilliseconds(0)
+//   tomorrow.setSeconds(0)
+//   tomorrow.setMilliseconds(0)
+//   tomorrow.setMinutes(nextQuarterTime)
+//   tomorrow.setDate(now.getDate() + 1);
+//   let request = {
+//     userId: 'P04uDRqH0tOIfXw89tJXTlFidqC3',
+//     industry: 0,
+//     industryPreference: 12,
+//     location: {
+//       coords: {
+//         latitude: 1.3236038,
+//         longitude: 103.9273405
+//       }
+//     },
+//     distance: 200,
+//     dietaryRestriction: 'Any',
+//     description: "Bedok, Singapore",
+//     cuisinePreference: "Western",
+//   }
+//   while(tomorrow - now > 0) {
+//     console.log('now', now);
+//     findGobbleMateHelper({...request, datetime: now.toString()})
+//     now.setMinutes(now.getMinutes() + 15)
+//   }
+// })

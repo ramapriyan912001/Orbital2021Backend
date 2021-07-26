@@ -3,7 +3,7 @@ const {admin} = require("../utils/admin");
 const functions = require('firebase-functions')
 const { config } = require("../utils/config");
 const fetcher = require('node-fetch')
-const {BLOCK_SUCCESS, BLOCK_FAILURE, UNBLOCK_SUCCESS, UNBLOCK_FAILURE, MAKE_REPORT_SUCCESS, MAKE_REPORT_FAILURE} = require('./Results');
+const {BLOCK_SUCCESS, BLOCK_FAILURE, UNBLOCK_SUCCESS, UNBLOCK_FAILURE, MAKE_REPORT_SUCCESS, MAKE_REPORT_FAILURE, DELETE_REPORT_SUCCESS, DELETE_REPORT_FAILURE} = require('./Results');
 const { makeDateTimeString, getPendingTime } = require("./MatchingHelpers");
 
 function removeBlockedUserPendingMatches(uid, otherUid, pendingMatches) {
@@ -73,10 +73,16 @@ function removeBlockedUserMatches(uid, otherUid, matches) {
         updates[`/Chats/${otherUid}/${uid}`] = null
         try {
           admin.database().ref().update(updates)
-          return BLOCK_SUCCESS
+          return {
+            success: true,
+            message: BLOCK_SUCCESS
+          }
         } catch(err) {
           console.log("Block user error: " + err)
-          return BLOCK_FAILURE
+          return {
+            success: false,
+            message: BLOCK_FAILURE
+          }
         }
       }
     )
@@ -102,10 +108,16 @@ function removeBlockedUserMatches(uid, otherUid, matches) {
     updates[`/Users/${uid}/blockedUsers/${otherUid}`] = null;
     try {
       await admin.database().ref().update(updates)
-      return UNBLOCK_SUCCESS
+      return {
+        success: true,
+        message: UNBLOCK_SUCCESS
+      }
     } catch(err) {
       console.log("Block user error: " + err)
-      return UNBLOCK_FAILURE
+      return {
+        success: false,
+        message: UNBLOCK_FAILURE
+      }
     }
 }
 
@@ -227,7 +239,7 @@ exports.makeReport = async(data, context) => {
     } catch(err) {
       console.log("delete report error " + err);
       return {
-        success: true,
+        success: false,
         message: DELETE_REPORT_FAILURE
       }
     }
